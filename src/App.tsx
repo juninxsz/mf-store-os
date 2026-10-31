@@ -19,16 +19,16 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 
 // --- FIREBASE SETUP ---
-// 👇 COLE AS SUAS CHAVES DO FIREBASE AQUI DENTRO 👇
+// Configuração real da sua base de dados "controle-de-estoque"
 const firebaseConfig = {
-  apiKey: "SUA_API_KEY_AQUI",
-  authDomain: "SEU_AUTH_DOMAIN_AQUI",
-  projectId: "SEU_PROJECT_ID_AQUI",
-  storageBucket: "SEU_STORAGE_BUCKET_AQUI",
-  messagingSenderId: "SEU_SENDER_ID_AQUI",
-  appId: "SEU_APP_ID_AQUI"
+  apiKey: "AIzaSyDsAB2ft4lawPqbY_3U-YHJfUFIYJ3lVA0",
+  authDomain: "controle-de-estoque-c59f1.firebaseapp.com",
+  projectId: "controle-de-estoque-c59f1",
+  storageBucket: "controle-de-estoque-c59f1.firebasestorage.app",
+  messagingSenderId: "201083695622",
+  appId: "1:201083695622:web:e38955796a2e5599870987",
+  measurementId: "G-MP1TX35SLK"
 };
-// 👆 ========================================= 👆
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
