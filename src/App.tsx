@@ -159,6 +159,9 @@ export default function MFStoreOS() {
   const [newExpense, setNewExpense] = useState({ description: '', amount: '', type: 'Fixa' });
   const [pinInput, setPinInput] = useState('');
   const [pinAction, setPinAction] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loginForm, setLoginForm] = useState({ user: '', password: '' });
+  const [loginError, setLoginError] = useState(false);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -168,6 +171,17 @@ export default function MFStoreOS() {
     const unsubscribe = onAuthStateChanged(auth, setUser);
     return () => unsubscribe();
   }, []);
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (loginForm.user === 'mfstore' && loginForm.password === 'chis130985') {
+      setIsAuthenticated(true);
+      setLoginError(false);
+      logAudit('Login no Sistema', 'Usuário master autenticado com sucesso.', 'info');
+    } else {
+      setLoginError(true);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -481,10 +495,10 @@ export default function MFStoreOS() {
     if (!sale || !sale.customerPhone) return '#';
     const cleanPhone = sale.customerPhone.replace(/\D/g, '');
     const cashback = sale.total * 0.05; 
-    let msg = `🛍️ *MF Store - Recibo* 🛍️\n\nOlá ${sale.customerName}! Obrigado.\n\n*Compra:*\n`;
+    let msg = `🛍️ *MF Store - Recibo Digital* 🛍️\n\nOlá ${sale.customerName}! Muito obrigado pela preferência.\n\n*Resumo da sua compra:*\n`;
     sale.items.forEach(i => { msg += `- ${i.quantity}x ${i.name} (Tam: ${i.size}) : ${formatCurrency(i.price * i.quantity)}\n`; });
     if (sale.discountValue > 0) msg += `\nDesconto: - ${formatCurrency(sale.discountValue)}`;
-    msg += `\n*TOTAL: ${formatCurrency(sale.total)}*\n\n🎁 *Ganhou ${formatCurrency(cashback)} de CASHBACK* na próxima compra!\n\nVolte sempre! ✨`;
+    msg += `\n*TOTAL: ${formatCurrency(sale.total)}*\n\n🎁 *Você ganhou ${formatCurrency(cashback)} de CASHBACK* para usar na sua próxima compra!\n\nVolte sempre! ✨`;
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`;
   };
 
@@ -548,13 +562,12 @@ export default function MFStoreOS() {
     setVitrineCart(prev => {
       const exists = prev.find(i => i.id === product.id);
       if (exists) {
-        if (exists.quantity >= product.stock) { return prev; }
+        if (exists.quantity >= product.stock) { showToast('Estoque atingido!', 'error'); return prev; }
         return prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
       }
       return [...prev, { ...product, quantity: 1 }];
     });
   };
-  
   const vitrineTotal = vitrineCart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   const getVitrineOrderWhatsAppLink = () => {
     const cleanPhone = storeWhatsapp.replace(/\D/g, '');
@@ -575,6 +588,81 @@ export default function MFStoreOS() {
       {icon}<span>{label}</span>
     </button>
   );
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-black font-sans text-white flex items-center justify-center p-4 relative overflow-hidden selection:bg-pink-500/30">
+        <style>{customStyles}</style>
+        
+        {/* Background Effects */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-pink-600/10 blur-[120px] rounded-full pointer-events-none"></div>
+        <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-pink-900/10 blur-[120px] rounded-full pointer-events-none"></div>
+        
+        <div className="w-full max-w-md z-10 animate-fade-in-up">
+          <div className="bg-[#121212] rounded-[2.5rem] shadow-2xl p-10 border border-pink-500/20 relative">
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-pink-500 to-transparent opacity-50"></div>
+            
+            <div className="flex flex-col items-center mb-10">
+              <div className="w-24 h-24 rounded-3xl overflow-hidden mb-5 border-2 border-pink-500/30 shadow-[0_0_30px_rgba(236,72,153,0.15)] bg-black flex items-center justify-center">
+                <img src="https://i.ibb.co/sK6W4qD/mf-store-logo.jpg" alt="MF Store Logo" className="w-full h-full object-cover" />
+              </div>
+              <h1 className="text-2xl font-black tracking-widest text-white uppercase">MF Store</h1>
+              <p className="text-xs uppercase font-black tracking-[0.25em] text-pink-500 mt-1">Premium OS</p>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div>
+                <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 pl-2">Usuário</label>
+                <div className="relative">
+                  <User className="absolute left-4 top-3.5 text-pink-500/50" size={18} />
+                  <input 
+                    type="text" 
+                    value={loginForm.user}
+                    onChange={e => setLoginForm({...loginForm, user: e.target.value})}
+                    placeholder="Digite o utilizador"
+                    className="w-full bg-black border border-zinc-800 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-white placeholder-zinc-700 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-all outline-none"
+                    required
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 pl-2">Senha</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-3.5 text-pink-500/50" size={18} />
+                  <input 
+                    type="password" 
+                    value={loginForm.password}
+                    onChange={e => setLoginForm({...loginForm, password: e.target.value})}
+                    placeholder="••••••••"
+                    className="w-full bg-black border border-zinc-800 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-white placeholder-zinc-700 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-all outline-none tracking-widest"
+                    required
+                  />
+                </div>
+              </div>
+
+              {loginError && (
+                <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-xl flex items-center gap-2 animate-modal">
+                  <AlertCircle size={16} className="text-red-500 flex-shrink-0" />
+                  <p className="text-xs font-bold text-red-400">Usuário ou senha incorretos. Tente novamente.</p>
+                </div>
+              )}
+
+              <button 
+                type="submit" 
+                className="w-full mt-2 py-4 bg-pink-600 hover:bg-pink-500 text-black font-black uppercase tracking-widest rounded-2xl shadow-[0_0_20px_rgba(236,72,153,0.3)] btn-press transition-all flex items-center justify-center gap-2"
+              >
+                Acessar Sistema <ArrowLeftRight size={16} className="rotate-180" />
+              </button>
+            </form>
+          </div>
+          <p className="text-center text-[10px] font-bold text-zinc-600 uppercase tracking-widest mt-8">
+            Sistema Restrito • MF Store 2026
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black font-sans text-white flex overflow-hidden selection:bg-pink-500/30">
@@ -703,7 +791,7 @@ export default function MFStoreOS() {
           )}
 
           {activeTab === 'pos' && (
-            <div className="flex flex-col xl:flex-row gap-6 animate-fade-in-up pb-20">
+            <div className="h-full flex flex-col xl:flex-row gap-6 animate-fade-in-up pb-20">
               <div className="flex-1 flex flex-col min-h-[500px]">
                 <div className="flex flex-col gap-3 mb-6">
                   <div className="relative flex-1">
@@ -1111,7 +1199,7 @@ export default function MFStoreOS() {
                       </div>
                       <div className="flex sm:flex-col justify-between w-full sm:w-auto sm:text-right border-t sm:border-t-0 pt-3 sm:pt-0 border-zinc-800">
                         <div><p className="text-[10px] font-bold uppercase text-zinc-500">Total Vendido</p><p className="text-lg font-black text-white">{formatCurrency(st.totalRevenue)}</p></div>
-                        <div className="sm:mt-1"><p className="text-[10px] font-bold uppercase text-emerald-500">Comissão a Pagar</p><p className="text-xl font-black text-emerald-400">{formatCurrency(st.totalCommission)}</p></div>
+                        <div className="sm:mt-1"><p className="text-[10px] font-bold uppercase text-emerald-500">Comissão a Pagar</p><p className="text-xl font-black text-emerald-600">{formatCurrency(st.totalCommission)}</p></div>
                       </div>
                     </div>
                   ))}
@@ -1211,7 +1299,7 @@ export default function MFStoreOS() {
             <div className="animate-fade-in-up flex flex-col items-center pb-10">
               <div className="text-center mb-6">
                 <h2 className="text-3xl font-black text-white flex items-center justify-center gap-2"><Globe className="text-pink-500"/> Vitrine Digital Interativa</h2>
-                <div className="mt-4 inline-flex items-center gap-2 bg-[#121212] px-4 py-2 rounded-2xl border border-pink-500/20 shadow-sm"><MessageCircle size={16} className="text-emerald-500" /><span className="text-xs font-bold text-zinc-400">WhatsApp da Loja:</span><input type="text" value={storeWhatsapp} onChange={e => setStoreWhatsapp(e.target.value)} className="text-xs font-black text-white bg-black px-2.5 py-1 rounded-lg border border-zinc-800 w-32 focus:border-pink-500" /></div>
+                <div className="mt-4 inline-flex items-center gap-2 bg-[#121212] px-4 py-2 rounded-2xl border border-pink-500/20 shadow-sm"><MessageCircle size={16} className="text-emerald-500" /><span className="text-xs font-bold text-zinc-500">WhatsApp da Loja:</span><input type="text" value={storeWhatsapp} onChange={e => setStoreWhatsapp(e.target.value)} className="text-xs font-black text-white bg-black px-2.5 py-1 rounded-lg border border-zinc-800 w-32 focus:border-pink-500" /></div>
               </div>
               <div className="w-full max-w-[370px] h-[740px] bg-black rounded-[3rem] border-[10px] border-[#1a1a1a] shadow-[0_0_30px_rgba(236,72,153,0.1)] relative overflow-hidden flex flex-col hover-lift">
                 <div className="absolute top-0 inset-x-0 h-6 bg-[#1a1a1a] rounded-b-3xl w-40 mx-auto z-50"></div>
