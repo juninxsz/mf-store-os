@@ -15,7 +15,7 @@ import {
 
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 
 // --- FIREBASE SETUP ---
@@ -37,12 +37,12 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'mf-store-os-premium'
 // --- CUSTOM STYLES & MOTION DESIGN ---
 const customStyles = `
   @keyframes fadeInUp {
-    from { opacity: 0; transform: tranzincY(20px) scale(0.98); }
-    to { opacity: 1; transform: tranzincY(0) scale(1); }
+    from { opacity: 0; transform: translateY(20px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
   }
   @keyframes slideInRight {
-    from { transform: tranzincX(100%); opacity: 0; }
-    to { transform: tranzincX(0); opacity: 1; }
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
   }
   @keyframes fadeIn {
     from { opacity: 0; backdrop-filter: blur(0px); }
@@ -53,8 +53,8 @@ const customStyles = `
     50% { transform: scale(1.05); }
   }
   @keyframes scaleIn {
-    0% { opacity: 0; transform: scale(0.92) tranzincY(15px); }
-    100% { opacity: 1; transform: scale(1) tranzincY(0); }
+    0% { opacity: 0; transform: scale(0.92) translateY(15px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
   }
   .animate-fade-in-up { animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
   .animate-slide-in-right { animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
@@ -65,7 +65,7 @@ const customStyles = `
   .btn-press { transition: all 0.15s ease; }
   .btn-press:active { transform: scale(0.94); }
   .hover-lift { transition: all 0.3s ease; }
-  .hover-lift:hover { transform: tranzincY(-4px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
+  .hover-lift:hover { transform: translateY(-4px); box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); }
   
   .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
   .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -177,13 +177,15 @@ export default function MFStoreOS() {
 
   useEffect(() => {
     if (!user) return;
-    const productsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'products');
-    const salesRef = collection(db, 'artifacts', appId, 'users', user.uid, 'sales');
-    const auditsRef = collection(db, 'artifacts', appId, 'users', user.uid, 'audits');
-    const registerRef = collection(db, 'artifacts', appId, 'users', user.uid, 'register_events');
-    const expensesRef = collection(db, 'artifacts', appId, 'users', user.uid, 'expenses');
-    const vouchersRef = collection(db, 'artifacts', appId, 'users', user.uid, 'vouchers');
-    const condicionaisRef = collection(db, 'artifacts', appId, 'users', user.uid, 'condicionais');
+    
+    // ATUALIZAÇÃO: Removido o 'users', user.uid para globalizar a base de dados
+    const productsRef = collection(db, 'artifacts', appId, 'products');
+    const salesRef = collection(db, 'artifacts', appId, 'sales');
+    const auditsRef = collection(db, 'artifacts', appId, 'audits');
+    const registerRef = collection(db, 'artifacts', appId, 'register_events');
+    const expensesRef = collection(db, 'artifacts', appId, 'expenses');
+    const vouchersRef = collection(db, 'artifacts', appId, 'vouchers');
+    const condicionaisRef = collection(db, 'artifacts', appId, 'condicionais');
     
     const unsubProducts = onSnapshot(productsRef, (snapshot) => setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     const unsubSales = onSnapshot(salesRef, (snapshot) => {
@@ -232,7 +234,7 @@ export default function MFStoreOS() {
 
   const logAudit = async (action, details, severity = 'info') => {
     if (!user) return;
-    try { await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'audits'), { action, details, severity, timestamp: Date.now() }); } catch (e) {}
+    try { await addDoc(collection(db, 'artifacts', appId, 'audits'), { action, details, severity, timestamp: Date.now() }); } catch (e) {}
   };
 
   const requestPin = (action) => { setPinAction(() => action); setIsPinModalOpen(true); };
@@ -251,13 +253,13 @@ export default function MFStoreOS() {
     e.preventDefault();
     const amount = parseFloat(openRegisterAmount) || 0;
     const ts = Date.now();
-    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'register_events'), { type: 'OPEN', amount, currentBalance: amount, timestamp: ts, openedAt: ts });
+    await addDoc(collection(db, 'artifacts', appId, 'register_events'), { type: 'OPEN', amount, currentBalance: amount, timestamp: ts, openedAt: ts });
     logAudit('Caixa Aberto', `Saldo inicial informado: ${formatCurrency(amount)}`, 'success');
     setOpenRegisterAmount(''); showToast('Caixa aberto com sucesso!');
   };
 
   const handleCloseRegister = async () => {
-    await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'register_events'), { type: 'CLOSE', amount: register.balance, currentBalance: 0, timestamp: Date.now() });
+    await addDoc(collection(db, 'artifacts', appId, 'register_events'), { type: 'CLOSE', amount: register.balance, currentBalance: 0, timestamp: Date.now() });
     logAudit('Caixa Fechado', `Saldo final em gaveta: ${formatCurrency(register.balance)}`, 'warning');
     showToast('Caixa fechado com segurança.', 'success');
   };
@@ -268,7 +270,7 @@ export default function MFStoreOS() {
     if (amount > register.balance) { showToast('Valor da sangria maior que o saldo em caixa!', 'error'); return; }
     requestPin(async () => {
       const newBalance = register.balance - amount;
-      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'register_events'), { type: 'SANGRIA', amount, reason: sangriaReason, currentBalance: newBalance, timestamp: Date.now(), openedAt: register.openedAt });
+      await addDoc(collection(db, 'artifacts', appId, 'register_events'), { type: 'SANGRIA', amount, reason: sangriaReason, currentBalance: newBalance, timestamp: Date.now(), openedAt: register.openedAt });
       logAudit('Sangria Realizada', `Retirada de ${formatCurrency(amount)}. Motivo: ${sangriaReason}`, 'warning');
       setIsSangriaModalOpen(false); setSangriaAmount(''); setSangriaReason(''); showToast('Sangria registrada com sucesso.');
     });
@@ -278,7 +280,7 @@ export default function MFStoreOS() {
     e.preventDefault();
     if (!user) return;
     try {
-      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'expenses'), { description: newExpense.description, amount: parseFloat(newExpense.amount), type: newExpense.type, timestamp: Date.now() });
+      await addDoc(collection(db, 'artifacts', appId, 'expenses'), { description: newExpense.description, amount: parseFloat(newExpense.amount), type: newExpense.type, timestamp: Date.now() });
       setNewExpense({ description: '', amount: '', type: 'Fixa' });
       showToast('Despesa registrada com sucesso!');
       logAudit('Despesa Adicionada', `Nova despesa ${newExpense.type}: ${newExpense.description} - ${formatCurrency(newExpense.amount)}`, 'info');
@@ -288,7 +290,7 @@ export default function MFStoreOS() {
   const handleDeleteExpense = (id, desc) => {
     requestPin(async () => {
       try {
-        await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'expenses', id));
+        await deleteDoc(doc(db, 'artifacts', appId, 'expenses', id));
         showToast('Despesa removida.'); logAudit('Despesa Removida', `Despesa excluída: ${desc}`, 'warning');
       } catch(e) {}
     });
@@ -324,14 +326,14 @@ export default function MFStoreOS() {
         const sizesToCreate = Object.entries(gridStocks).filter(([, qty]) => parseInt(qty) > 0);
         if (sizesToCreate.length === 0) { showToast('Informe a quantidade de pelo menos 1 tamanho na grade!', 'error'); return; }
         for (const [sz, qty] of sizesToCreate) {
-          await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'products'), {
+          await addDoc(collection(db, 'artifacts', appId, 'products'), {
             name: newProduct.name, category: newProduct.category, price: parseFloat(newProduct.price), cost: parseFloat(newProduct.cost),
             size: sz, stock: parseInt(qty), image: newProduct.image || null, isVitrine: newProduct.isVitrine, createdAt: Date.now()
           });
         }
         showToast(`Grade criada com ${sizesToCreate.length} tamanhos!`);
       } else {
-        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'products'), {
+        await addDoc(collection(db, 'artifacts', appId, 'products'), {
           name: newProduct.name, category: newProduct.category, price: parseFloat(newProduct.price), cost: parseFloat(newProduct.cost),
           size: newProduct.size, stock: parseInt(newProduct.stock), image: newProduct.image || null, isVitrine: newProduct.isVitrine, createdAt: Date.now()
         });
@@ -345,7 +347,7 @@ export default function MFStoreOS() {
   const handleDeleteProduct = (id, name) => {
     requestPin(async () => {
       try {
-        await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'products', id));
+        await deleteDoc(doc(db, 'artifacts', appId, 'products', id));
         logAudit('Produto Excluído', `A peça "${name}" foi removida do sistema.`, 'warning'); showToast('Produto removido.');
       } catch (e) {}
     });
@@ -353,7 +355,7 @@ export default function MFStoreOS() {
 
   const toggleVitrine = async (product) => {
     try {
-      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'products', product.id), { isVitrine: !product.isVitrine });
+      await updateDoc(doc(db, 'artifacts', appId, 'products', product.id), { isVitrine: !product.isVitrine });
       showToast(`Produto ${!product.isVitrine ? 'adicionado à' : 'removido da'} vitrine digital.`);
     } catch (e) {}
   };
@@ -390,12 +392,12 @@ export default function MFStoreOS() {
     if (!customerName.trim() || !customerPhone.trim()) { showToast('Preencha Nome e WhatsApp do cliente!', 'error'); return; }
     try {
       const deadline = Date.now() + (48 * 60 * 60 * 1000);
-      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'condicionais'), {
+      await addDoc(collection(db, 'artifacts', appId, 'condicionais'), {
         customerName, customerPhone, items: cart.map(i => ({ id: i.id, name: i.name, price: i.price, cost: i.cost, quantity: i.quantity, size: i.size, image: i.image || null })),
         totalValue: cartSubtotal, status: 'PENDENTE', createdAt: Date.now(), deadline
       });
       for (const item of cart) {
-        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'products', item.id), { stock: Math.max(0, item.stock - item.quantity) });
+        await updateDoc(doc(db, 'artifacts', appId, 'products', item.id), { stock: Math.max(0, item.stock - item.quantity) });
       }
       logAudit('Malinha Enviada', `Cliente: ${customerName} (${cart.length} itens)`, 'info');
       setCart([]); setCustomerName(''); setCustomerPhone('');
@@ -408,9 +410,9 @@ export default function MFStoreOS() {
     try {
       for (const item of cond.items) {
         const prod = products.find(p => p.id === item.id);
-        if (prod) await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'products', item.id), { stock: (prod.stock || 0) + item.quantity });
+        if (prod) await updateDoc(doc(db, 'artifacts', appId, 'products', item.id), { stock: (prod.stock || 0) + item.quantity });
       }
-      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'condicionais', cond.id), { status: 'DEVOLVIDO' });
+      await updateDoc(doc(db, 'artifacts', appId, 'condicionais', cond.id), { status: 'DEVOLVIDO' });
       showToast('Peças devolvidas ao estoque com sucesso!');
     } catch (e) { showToast('Erro ao devolver condicional.', 'error'); }
   };
@@ -420,9 +422,9 @@ export default function MFStoreOS() {
     try {
       for (const item of cond.items) {
         const prod = products.find(p => p.id === item.id);
-        if (prod) await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'products', item.id), { stock: (prod.stock || 0) + item.quantity });
+        if (prod) await updateDoc(doc(db, 'artifacts', appId, 'products', item.id), { stock: (prod.stock || 0) + item.quantity });
       }
-      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'condicionais', cond.id), { status: 'CONVERTIDO' });
+      await updateDoc(doc(db, 'artifacts', appId, 'condicionais', cond.id), { status: 'CONVERTIDO' });
       setCustomerName(cond.customerName); setCustomerPhone(cond.customerPhone);
       setCart(cond.items.map(i => {
         const currentProd = products.find(p => p.id === i.id);
@@ -458,11 +460,11 @@ Separamos as seguintes peças para você provar no conforto de casa:
     if (!item || item.exchanged) return;
     try {
       const prod = products.find(p => p.id === item.id);
-      if (prod) await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'products', item.id), { stock: (prod.stock || 0) + 1 });
+      if (prod) await updateDoc(doc(db, 'artifacts', appId, 'products', item.id), { stock: (prod.stock || 0) + 1 });
       const code = `TROCA-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-      await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'vouchers'), { code, customerName: sale.customerName, itemName: item.name, amount: item.price, used: false, createdAt: Date.now() });
+      await addDoc(collection(db, 'artifacts', appId, 'vouchers'), { code, customerName: sale.customerName, itemName: item.name, amount: item.price, used: false, createdAt: Date.now() });
       const updatedItems = sale.items.map((it, idx) => idx === itemIndex ? { ...it, exchanged: true } : it);
-      await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'sales', sale.id), { items: updatedItems });
+      await updateDoc(doc(db, 'artifacts', appId, 'sales', sale.id), { items: updatedItems });
       showToast(`Vale-Troca ${code} gerado e peça devolvida ao estoque!`);
     } catch (e) { showToast('Erro ao gerar vale-troca.', 'error'); }
   };
@@ -473,10 +475,10 @@ Separamos as seguintes peças para você provar no conforto de casa:
         for (const item of sale.items) {
           if (!item.exchanged) {
             const prod = products.find(p => p.id === item.id);
-            if (prod) await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'products', item.id), { stock: (prod.stock || 0) + item.quantity });
+            if (prod) await updateDoc(doc(db, 'artifacts', appId, 'products', item.id), { stock: (prod.stock || 0) + item.quantity });
           }
         }
-        await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'sales', sale.id));
+        await deleteDoc(doc(db, 'artifacts', appId, 'sales', sale.id));
         showToast('Venda estornada e peças devolvidas ao estoque.');
       } catch (e) { showToast('Erro ao estornar venda.', 'error'); }
     });
@@ -501,11 +503,11 @@ Separamos as seguintes peças para você provar no conforto de casa:
           subtotal: cartSubtotal, totalCost: cartCost, discountPercent: parseFloat(discountPercent || 0), discountValue,
           voucherCode: appliedVoucher ? appliedVoucher.code : null, voucherDiscount, total: cartTotal, paymentMethod: formattedMethod, timestamp: Date.now()
         };
-        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'sales'), saleObj);
-        if (appliedVoucher) await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'vouchers', appliedVoucher.id), { used: true, usedAt: Date.now() });
-        for (const item of cart) await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'products', item.id), { stock: Math.max(0, item.stock - item.quantity) });
+        await addDoc(collection(db, 'artifacts', appId, 'sales'), saleObj);
+        if (appliedVoucher) await updateDoc(doc(db, 'artifacts', appId, 'vouchers', appliedVoucher.id), { used: true, usedAt: Date.now() });
+        for (const item of cart) await updateDoc(doc(db, 'artifacts', appId, 'products', item.id), { stock: Math.max(0, item.stock - item.quantity) });
         const cashReceived = paymentMethod === 'dinheiro' ? cartTotal : (paymentMethod === 'misto' ? ((splitPayment.method1 === 'dinheiro' ? amt1 : 0) + (splitPayment.method2 === 'dinheiro' ? amt2 : 0)) : 0);
-        if (cashReceived > 0 && register.isOpen) await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'register_events'), { type: 'SALE', amount: cashReceived, currentBalance: register.balance + cashReceived, timestamp: Date.now(), openedAt: register.openedAt });
+        if (cashReceived > 0 && register.isOpen) await addDoc(collection(db, 'artifacts', appId, 'register_events'), { type: 'SALE', amount: cashReceived, currentBalance: register.balance + cashReceived, timestamp: Date.now(), openedAt: register.openedAt });
         
         setLastSaleData(saleObj); setCart([]); setCustomerName(''); setCustomerPhone(''); setDiscountPercent(''); setAppliedVoucher(null); setSelectedPaymentMethod(null);
         setIsCheckoutModalOpen(false); setIsReceiptModalOpen(true);
