@@ -488,6 +488,12 @@ export default function MFStoreOS() {
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`;
   };
 
+  const getDirectChatLink = (phone) => {
+    if (!phone) return '#';
+    const cleanPhone = phone.replace(/\D/g, '');
+    return `https://wa.me/55${cleanPhone}`;
+  };
+
   // Derived Data
   const dashboardStats = useMemo(() => {
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
@@ -535,27 +541,16 @@ export default function MFStoreOS() {
     e.preventDefault();
     if (!newSeller.name.trim()) return;
     const created = { id: `seller-${Date.now()}`, name: newSeller.name.trim(), rate: parseFloat(newSeller.rate) || 5 };
-    setSellers(prev => [...prev, created]); setSelectedSeller(`${created.name} (${created.rate}%)`); setNewSeller({ name: '', rate: 5 }); showToast(`Vendedora ${created.name} salva!`);
-  };
-
-  const handleCreateLook = (e) => {
-    e.preventDefault();
-    if (!newLook.name.trim() || newLook.selectedProductIds.length < 2) { showToast('2 peças mínimas!', 'error'); return; }
-    const chosenProducts = products.filter(p => newLook.selectedProductIds.includes(p.id));
-    const created = { id: `look-${Date.now()}`, name: newLook.name.trim(), discountPercent: parseFloat(newLook.discountPercent) || 10, itemNames: chosenProducts.map(p => `${p.name} (${p.size})`), productIds: newLook.selectedProductIds };
-    setLooks(prev => [created, ...prev]); setNewLook({ name: '', discountPercent: 10, selectedProductIds: [] }); showToast('Look salvo!');
-  };
-
-  const handleApplyLookToPOS = (look) => {
-    const matchedProducts = products.filter(p => (look.productIds && look.productIds.includes(p.id)) || (look.itemNames && look.itemNames.some(n => p.name.toLowerCase().includes(n.toLowerCase())))).filter(p => p.stock > 0);
-    if (matchedProducts.length === 0) { showToast('Sem estoque!', 'error'); return; }
-    matchedProducts.forEach(p => addToCart(p)); setDiscountPercent(String(look.discountPercent)); setActiveTab('pos'); showToast(`Look aplicado!`);
+    setSellers(prev => [...prev, created]); setSelectedSeller(`${created.name} (${created.rate}%)`); setNewSeller({ name: '', rate: 5 }); showToast(`Vendedora ${created.name} cadastrada!`);
   };
 
   const addToVitrineCart = (product) => {
     setVitrineCart(prev => {
       const exists = prev.find(i => i.id === product.id);
-      if (exists) { if (exists.quantity >= product.stock) { return prev; } return prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i); }
+      if (exists) {
+        if (exists.quantity >= product.stock) { return prev; }
+        return prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
+      }
       return [...prev, { ...product, quantity: 1 }];
     });
   };
@@ -587,13 +582,13 @@ export default function MFStoreOS() {
 
       {/* --- SIDEBAR --- */}
       <aside className="w-72 bg-[#0a0a0a] border-r border-pink-900/30 flex flex-col p-6 z-20 hidden lg:flex shadow-2xl">
-        <div className="flex items-center space-x-3 mb-10 pl-2">
-          <div className="w-12 h-12 bg-gradient-to-br from-pink-600 to-pink-900 rounded-2xl flex items-center justify-center text-black shadow-lg shadow-pink-500/20 hover-lift cursor-pointer">
-            <Sparkles size={24} className="animate-pulse-soft" />
+        <div className="flex flex-col items-center mb-8 pb-4 border-b border-pink-900/30">
+          <div className="w-32 h-32 rounded-3xl overflow-hidden mb-4 border-2 border-pink-600/30 shadow-[0_0_20px_rgba(236,72,153,0.15)] hover-lift cursor-pointer bg-black flex items-center justify-center">
+            <img src="https://i.ibb.co/sK6W4qD/mf-store-logo.jpg" alt="MF Store Logo" className="w-full h-full object-cover" />
           </div>
-          <div>
-            <h1 className="text-2xl font-black tracking-tight text-white">MF Store<span className="text-pink-600">.</span></h1>
-            <p className="text-[10px] uppercase font-bold tracking-widest text-pink-500">Premium OS</p>
+          <div className="text-center">
+            <h1 className="text-xl font-black tracking-widest text-white uppercase">MF Store</h1>
+            <p className="text-[10px] uppercase font-black tracking-[0.2em] text-pink-500 mt-1">Premium OS</p>
           </div>
         </div>
 
@@ -618,9 +613,11 @@ export default function MFStoreOS() {
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative bg-[#050505]">
         <header className="lg:hidden glass-panel p-3 flex flex-col gap-2 sticky top-0 z-20 bg-black/90">
           <div className="flex justify-between items-center px-2">
-            <div className="flex items-center">
-              <Sparkles size={18} className="text-pink-600 mr-2" />
-              <h1 className="text-lg font-black tracking-tight text-white">MF Store<span className="text-pink-600">.</span></h1>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl overflow-hidden border border-pink-500/30 bg-black flex items-center justify-center">
+                <img src="https://i.ibb.co/sK6W4qD/mf-store-logo.jpg" alt="MF Store" className="w-full h-full object-cover" />
+              </div>
+              <h1 className="text-lg font-black tracking-widest text-white uppercase">MF Store</h1>
             </div>
             <span className="text-[10px] uppercase font-bold tracking-widest bg-pink-900/30 text-pink-400 px-2.5 py-1 rounded-full border border-pink-500/20">Premium OS</span>
           </div>
@@ -929,7 +926,7 @@ export default function MFStoreOS() {
                   <form onSubmit={handleCreateLook} className="space-y-4">
                     <div>
                       <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Nome do Look / Kit</label>
-                      <input required type="text" placeholder="Ex: Combo Noite" value={newLook.name} onChange={e => setNewLook({ ...newLook, name: e.target.value })} className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-sm font-bold text-white placeholder-zinc-700 focus:border-pink-500" />
+                      <input required type="text" placeholder="Ex: Combo Noite Streetwear" value={newLook.name} onChange={e => setNewLook({ ...newLook, name: e.target.value })} className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-3 text-sm font-bold text-white placeholder-zinc-700 focus:border-pink-500" />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Desconto do Combo (%)</label>
@@ -1218,7 +1215,7 @@ export default function MFStoreOS() {
               </div>
               <div className="w-full max-w-[370px] h-[740px] bg-black rounded-[3rem] border-[10px] border-[#1a1a1a] shadow-[0_0_30px_rgba(236,72,153,0.1)] relative overflow-hidden flex flex-col hover-lift">
                 <div className="absolute top-0 inset-x-0 h-6 bg-[#1a1a1a] rounded-b-3xl w-40 mx-auto z-50"></div>
-                <div className="pt-10 pb-4 px-6 bg-[#121212] text-white text-center border-b border-pink-500/10"><div className="w-14 h-14 bg-pink-600 rounded-2xl mx-auto flex items-center justify-center text-black mb-2 shadow-lg"><Store size={26} /></div><h3 className="font-black text-lg">MF Store</h3></div>
+                <div className="pt-10 pb-4 px-6 bg-[#121212] text-white text-center border-b border-pink-500/10"><div className="w-20 h-20 rounded-2xl mx-auto flex items-center justify-center bg-black overflow-hidden mb-2 shadow-[0_0_15px_rgba(236,72,153,0.2)] border border-pink-500/20"><img src="https://i.ibb.co/sK6W4qD/mf-store-logo.jpg" alt="MF Store Logo" className="w-full h-full object-cover" /></div><h3 className="font-black text-lg uppercase tracking-wider mt-2">MF Store</h3></div>
                 <div className="flex-1 overflow-y-auto p-3.5 bg-black custom-scrollbar">
                   <div className="grid grid-cols-2 gap-3">
                     {vitrineProducts.map(p => {
