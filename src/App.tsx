@@ -15,7 +15,7 @@ import {
 
 // --- FIREBASE IMPORTS ---
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 
 // --- FIREBASE SETUP ---
@@ -178,7 +178,7 @@ export default function MFStoreOS() {
   useEffect(() => {
     if (!user) return;
     
-    // ATUALIZAÇÃO: Removido o 'users', user.uid para globalizar a base de dados
+    // ATUALIZAÇÃO: Removida a separação por user.uid. Agora todos vêm a mesma base de dados.
     const productsRef = collection(db, 'artifacts', appId, 'products');
     const salesRef = collection(db, 'artifacts', appId, 'sales');
     const auditsRef = collection(db, 'artifacts', appId, 'audits');
@@ -364,14 +364,13 @@ export default function MFStoreOS() {
     setCart(prev => {
       const existing = prev.find(item => item.id === product.id);
       if (existing) {
-        if (existing.quantity >= product.stock) { showToast('Estoque insuficiente!', 'error'); return prev; }
+        if (existing.quantity >= product.stock) { showToast('Estoque atingido!', 'error'); return prev; }
         return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
       }
-      if (product.stock <= 0) { showToast('Produto esgotado!', 'error'); return prev; }
       return [...prev, { ...product, quantity: 1 }];
     });
   };
-
+  
   const removeFromCart = (id) => setCart(prev => prev.filter(item => item.id !== id));
 
   const cartSubtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -436,20 +435,10 @@ export default function MFStoreOS() {
 
   const getCondicionalWhatsAppLink = (cond) => {
     const cleanPhone = cond.customerPhone.replace(/\D/g, '');
-    let msg = `🛍️ *MF Store - Sua Malinha Chegou!* 🛍️
-
-Olá ${cond.customerName}!
-Separamos as seguintes peças para você provar no conforto de casa:
-
-`;
-    cond.items.forEach(i => { msg += `• ${i.quantity}x ${i.name} (Tam: ${i.size}) - ${formatCurrency(i.price * i.quantity)}
-`; });
-    msg += `
-*Valor Total da Malinha:* ${formatCurrency(cond.totalValue)}
-`;
-    msg += `*Prazo de Devolução:* ${new Date(cond.deadline).toLocaleDateString('pt-BR')} às ${new Date(cond.deadline).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}
-
-`;
+    let msg = `🛍️ *MF Store - Sua Malinha Chegou!* 🛍️\n\nOlá ${cond.customerName}!\nSeparamos as seguintes peças para você provar no conforto de casa:\n\n`;
+    cond.items.forEach(i => { msg += `• ${i.quantity}x ${i.name} (Tam: ${i.size}) - ${formatCurrency(i.price * i.quantity)}\n`; });
+    msg += `\n*Valor Total da Malinha:* ${formatCurrency(cond.totalValue)}\n`;
+    msg += `*Prazo de Devolução:* ${new Date(cond.deadline).toLocaleDateString('pt-BR')} às ${new Date(cond.deadline).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}\n\n`;
     msg += `Qualquer dúvida, estamos à disposição! ✨`;
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`;
   };
@@ -521,22 +510,10 @@ Separamos as seguintes peças para você provar no conforto de casa:
     if (!sale || !sale.customerPhone) return '#';
     const cleanPhone = sale.customerPhone.replace(/\D/g, '');
     const cashback = sale.total * 0.05; 
-    let msg = `🛍️ *MF Store - Recibo Digital* 🛍️
-
-Olá ${sale.customerName}! Muito obrigado pela preferência.
-
-*Resumo da sua compra:*
-`;
-    sale.items.forEach(i => { msg += `- ${i.quantity}x ${i.name} (Tam: ${i.size}) : ${formatCurrency(i.price * i.quantity)}
-`; });
-    if (sale.discountValue > 0) msg += `
-Desconto: - ${formatCurrency(sale.discountValue)}`;
-    msg += `
-*TOTAL: ${formatCurrency(sale.total)}*
-
-🎁 *Você ganhou ${formatCurrency(cashback)} de CASHBACK* para usar na sua próxima compra!
-
-Volte sempre! ✨`;
+    let msg = `🛍️ *MF Store - Recibo Digital* 🛍️\n\nOlá ${sale.customerName}! Muito obrigado pela preferência.\n\n*Resumo da sua compra:*\n`;
+    sale.items.forEach(i => { msg += `- ${i.quantity}x ${i.name} (Tam: ${i.size}) : ${formatCurrency(i.price * i.quantity)}\n`; });
+    if (sale.discountValue > 0) msg += `\nDesconto: - ${formatCurrency(sale.discountValue)}`;
+    msg += `\n*TOTAL: ${formatCurrency(sale.total)}*\n\n🎁 *Você ganhou ${formatCurrency(cashback)} de CASHBACK* para usar na sua próxima compra!\n\nVolte sempre! ✨`;
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`;
   };
 
@@ -609,18 +586,9 @@ Volte sempre! ✨`;
   const vitrineTotal = vitrineCart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   const getVitrineOrderWhatsAppLink = () => {
     const cleanPhone = storeWhatsapp.replace(/\D/g, '');
-    let msg = `🛍️ *Novo Pedido - Vitrine Digital MF Store*
-
-*Cliente:* ${vitrineCustomerName || 'Cliente Instagram'}
-
-*Peças escolhidas:*
-`;
-    vitrineCart.forEach(i => { msg += `• ${i.quantity}x ${i.name} (Tam: ${i.size}) - ${formatCurrency(i.price * i.quantity)}
-`; });
-    msg += `
-*Total do Pedido: ${formatCurrency(vitrineTotal)}*
-
-Podemos confirmar a disponibilidade? ✨`;
+    let msg = `🛍️ *Novo Pedido - Vitrine Digital MF Store*\n\n*Cliente:* ${vitrineCustomerName || 'Cliente Instagram'}\n\n*Peças escolhidas:*\n`;
+    vitrineCart.forEach(i => { msg += `• ${i.quantity}x ${i.name} (Tam: ${i.size}) - ${formatCurrency(i.price * i.quantity)}\n`; });
+    msg += `\n*Total do Pedido: ${formatCurrency(vitrineTotal)}*\n\nPodemos confirmar a disponibilidade? ✨`;
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`;
   };
   const sendVitrineOrderToPOS = () => {
