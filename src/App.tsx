@@ -98,6 +98,7 @@ export default function MFStoreOS() {
   const [expenses, setExpenses] = useState([]);
   const [vouchers, setVouchers] = useState([]);
   const [condicionais, setCondicionais] = useState([]);
+  const [looks, setLooks] = useState([]);
   const [register, setRegister] = useState({ isOpen: false, balance: 0, openedAt: null });
   
   // Modals & UI
@@ -133,9 +134,6 @@ export default function MFStoreOS() {
   const [splitPayment, setSplitPayment] = useState({ method1: 'pix', amount1: '', method2: 'credito' });
 
   // Combos / Looks States
-  const [looks, setLooks] = useState([{
-    id: 'look-1', name: 'Look Streetwear Completo', discountPercent: 12, itemNames: ['Camiseta Oversized Heavy', 'Calça Cargo Streetwear']
-  }]);
   const [newLook, setNewLook] = useState({ name: '', discountPercent: 10, selectedProductIds: [] });
 
   // Vitrine Digital Interactive States
@@ -159,7 +157,9 @@ export default function MFStoreOS() {
   const [newExpense, setNewExpense] = useState({ description: '', amount: '', type: 'Fixa' });
   const [pinInput, setPinInput] = useState('');
   const [pinAction, setPinAction] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  // Login State
+  const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('mfstore_auth') === 'true');
   const [loginForm, setLoginForm] = useState({ user: '', password: '' });
   const [loginError, setLoginError] = useState(false);
 
@@ -176,11 +176,17 @@ export default function MFStoreOS() {
     e.preventDefault();
     if (loginForm.user === 'mfstore' && loginForm.password === 'chis130985') {
       setIsAuthenticated(true);
+      localStorage.setItem('mfstore_auth', 'true');
       setLoginError(false);
-      logAudit('Login no Sistema', 'Usuário master autenticado com sucesso.', 'info');
+      logAudit('Login no Sistema', 'Usuário master autenticado.', 'info');
     } else {
       setLoginError(true);
     }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('mfstore_auth');
   };
 
   useEffect(() => {
@@ -192,6 +198,7 @@ export default function MFStoreOS() {
     const expensesRef = collection(db, 'artifacts', appId, 'expenses');
     const vouchersRef = collection(db, 'artifacts', appId, 'vouchers');
     const condicionaisRef = collection(db, 'artifacts', appId, 'condicionais');
+    const looksRef = collection(db, 'artifacts', appId, 'looks');
     
     const unsubProducts = onSnapshot(productsRef, (snapshot) => setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     const unsubSales = onSnapshot(salesRef, (snapshot) => {
@@ -231,7 +238,11 @@ export default function MFStoreOS() {
       conds.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       setCondicionais(conds);
     });
-    return () => { unsubProducts(); unsubSales(); unsubAudits(); unsubRegister(); unsubExpenses(); unsubVouchers(); unsubCondicionais(); };
+    const unsubLooks = onSnapshot(looksRef, (snapshot) => {
+      setLooks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => { unsubProducts(); unsubSales(); unsubAudits(); unsubRegister(); unsubExpenses(); unsubVouchers(); unsubCondicionais(); unsubLooks(); };
   }, [user]);
 
   const formatCurrency = (value) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
@@ -293,7 +304,10 @@ export default function MFStoreOS() {
 
   const handleDeleteExpense = (id, desc) => {
     requestPin(async () => {
-      try { await deleteDoc(doc(db, 'artifacts', appId, 'expenses', id)); showToast('Despesa apagada.'); } catch(e) {}
+      try {
+        await deleteDoc(doc(db, 'artifacts', appId, 'expenses', id));
+        showToast('Despesa apagada.'); logAudit('Despesa Removida', `Despesa excluída: ${desc}`, 'warning');
+      } catch(e) {}
     });
   };
 
@@ -495,10 +509,10 @@ export default function MFStoreOS() {
     if (!sale || !sale.customerPhone) return '#';
     const cleanPhone = sale.customerPhone.replace(/\D/g, '');
     const cashback = sale.total * 0.05; 
-    let msg = `🛍️ *MF Store - Recibo Digital* 🛍️\n\nOlá ${sale.customerName}! Muito obrigado pela preferência.\n\n*Resumo da sua compra:*\n`;
+    let msg = `🛍️ *MF Store - Recibo Digital*\n\nOlá ${sale.customerName}! Muito obrigado pela preferência.\n\n*Compra:*\n`;
     sale.items.forEach(i => { msg += `- ${i.quantity}x ${i.name} (Tam: ${i.size}) : ${formatCurrency(i.price * i.quantity)}\n`; });
     if (sale.discountValue > 0) msg += `\nDesconto: - ${formatCurrency(sale.discountValue)}`;
-    msg += `\n*TOTAL: ${formatCurrency(sale.total)}*\n\n🎁 *Você ganhou ${formatCurrency(cashback)} de CASHBACK* para usar na sua próxima compra!\n\nVolte sempre! ✨`;
+    msg += `\n*TOTAL: ${formatCurrency(sale.total)}*\n\n🎁 *Ganhou ${formatCurrency(cashback)} de CASHBACK* na próxima compra!\n\nVolte sempre! ✨`;
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`;
   };
 
@@ -506,6 +520,31 @@ export default function MFStoreOS() {
     if (!phone) return '#';
     const cleanPhone = phone.replace(/\D/g, '');
     return `https://wa.me/55${cleanPhone}`;
+  };
+
+  const handleCreateLook = async (e) => {
+    e.preventDefault();
+    if (!newLook.name.trim() || newLook.selectedProductIds.length < 2) { showToast('2 peças mínimas!', 'error'); return; }
+    const chosenProducts = products.filter(p => newLook.selectedProductIds.includes(p.id));
+    try {
+      await addDoc(collection(db, 'artifacts', appId, 'looks'), {
+        name: newLook.name.trim(),
+        discountPercent: parseFloat(newLook.discountPercent) || 10,
+        itemNames: chosenProducts.map(p => `${p.name} (${p.size})`),
+        productIds: newLook.selectedProductIds,
+        createdAt: Date.now()
+      });
+      setNewLook({ name: '', discountPercent: 10, selectedProductIds: [] });
+      showToast('Look salvo na nuvem!');
+    } catch (e) {
+      showToast('Erro ao salvar look', 'error');
+    }
+  };
+
+  const handleApplyLookToPOS = (look) => {
+    const matchedProducts = products.filter(p => (look.productIds && look.productIds.includes(p.id)) || (look.itemNames && look.itemNames.some(n => p.name.toLowerCase().includes(n.toLowerCase())))).filter(p => p.stock > 0);
+    if (matchedProducts.length === 0) { showToast('Sem estoque!', 'error'); return; }
+    matchedProducts.forEach(p => addToCart(p)); setDiscountPercent(String(look.discountPercent)); setActiveTab('pos'); showToast(`Look aplicado!`);
   };
 
   // Derived Data
@@ -562,12 +601,13 @@ export default function MFStoreOS() {
     setVitrineCart(prev => {
       const exists = prev.find(i => i.id === product.id);
       if (exists) {
-        if (exists.quantity >= product.stock) { showToast('Estoque atingido!', 'error'); return prev; }
+        if (exists.quantity >= product.stock) { return prev; }
         return prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
       }
       return [...prev, { ...product, quantity: 1 }];
     });
   };
+  
   const vitrineTotal = vitrineCart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   const getVitrineOrderWhatsAppLink = () => {
     const cleanPhone = storeWhatsapp.replace(/\D/g, '');
@@ -604,7 +644,7 @@ export default function MFStoreOS() {
             
             <div className="flex flex-col items-center mb-10">
               <div className="w-24 h-24 rounded-3xl overflow-hidden mb-5 border-2 border-pink-500/30 shadow-[0_0_30px_rgba(236,72,153,0.15)] bg-black flex items-center justify-center">
-                <img src="https://i.ibb.co/sK6W4qD/mf-store-logo.jpg" alt="MF Store Logo" className="w-full h-full object-cover" />
+                <img src="/logo.jpg" alt="MF Store Logo" className="w-full h-full object-cover" />
               </div>
               <h1 className="text-2xl font-black tracking-widest text-white uppercase">MF Store</h1>
               <p className="text-xs uppercase font-black tracking-[0.25em] text-pink-500 mt-1">Premium OS</p>
@@ -672,7 +712,7 @@ export default function MFStoreOS() {
       <aside className="w-72 bg-[#0a0a0a] border-r border-pink-900/30 flex flex-col p-6 z-20 hidden lg:flex shadow-2xl">
         <div className="flex flex-col items-center mb-8 pb-4 border-b border-pink-900/30">
           <div className="w-32 h-32 rounded-3xl overflow-hidden mb-4 border-2 border-pink-600/30 shadow-[0_0_20px_rgba(236,72,153,0.15)] hover-lift cursor-pointer bg-black flex items-center justify-center">
-            <img src="https://i.ibb.co/sK6W4qD/mf-store-logo.jpg" alt="MF Store Logo" className="w-full h-full object-cover" />
+            <img src="/logo.jpg" alt="MF Store Logo" className="w-full h-full object-cover" />
           </div>
           <div className="text-center">
             <h1 className="text-xl font-black tracking-widest text-white uppercase">MF Store</h1>
@@ -692,6 +732,10 @@ export default function MFStoreOS() {
           {renderSidebarItem('finance', <Lock size={20} />, 'Caixa (Gaveta)')}
           {renderSidebarItem('expenses', <TrendingDown size={20} />, 'Despesas (DRE)')}
           {renderSidebarItem('audit', <ShieldCheck size={20} />, 'Auditoria')}
+          
+          <button onClick={handleLogout} className="w-full flex items-center space-x-3 px-4 py-3.5 rounded-2xl transition-all duration-300 font-medium text-red-400 hover:bg-red-900/20 hover:text-red-300 mt-4">
+            <Lock size={20} /><span>Sair (Logout)</span>
+          </button>
           <div className="pt-4 pb-2"><p className="text-xs font-bold text-zinc-600 uppercase tracking-widest pl-4">Digital</p></div>
           {renderSidebarItem('vitrine', <Smartphone size={20} />, 'Vitrine Digital')}
         </nav>
@@ -703,7 +747,7 @@ export default function MFStoreOS() {
           <div className="flex justify-between items-center px-2">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl overflow-hidden border border-pink-500/30 bg-black flex items-center justify-center">
-                <img src="https://i.ibb.co/sK6W4qD/mf-store-logo.jpg" alt="MF Store" className="w-full h-full object-cover" />
+                <img src="/logo.jpg" alt="MF Store" className="w-full h-full object-cover" />
               </div>
               <h1 className="text-lg font-black tracking-widest text-white uppercase">MF Store</h1>
             </div>
@@ -715,9 +759,10 @@ export default function MFStoreOS() {
               { id: 'pos', label: 'PDV', icon: <ShoppingBag size={14} /> },
               { id: 'inventory', label: 'Estoque', icon: <PackageSearch size={14} /> },
               { id: 'sales_history', label: 'Trocas', icon: <ArrowLeftRight size={14} /> },
-              { id: 'condicional', label: 'Malinhas', icon: <Briefcase size={14} /> }
+              { id: 'condicional', label: 'Malinhas', icon: <Briefcase size={14} /> },
+              { id: 'logout', label: 'Sair', icon: <Lock size={14} /> },
             ].map(tab => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              <button key={tab.id} onClick={() => tab.id === 'logout' ? handleLogout() : setActiveTab(tab.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
                   activeTab === tab.id ? 'bg-pink-600 text-black shadow-sm shadow-pink-500/20' : 'bg-[#121212] text-zinc-400 hover:bg-zinc-800 border border-zinc-800'
                 }`}>
@@ -991,7 +1036,7 @@ export default function MFStoreOS() {
                             </button>
                           </td>
                           <td className="p-4 text-center">
-                            <button onClick={() => handleDeleteProduct(p.id, p.name)} className="text-zinc-600 hover:text-red-500 transition-colors btn-press"><Trash2 size={18}/></button>
+                            <button onClick={() => handleDeleteProduct(p.id, p.name)} className="text-zinc-600 hover:text-red-500 transition-colors btn-press"><Trash2 size={18} /></button>
                           </td>
                         </tr>
                       ))}
@@ -1050,7 +1095,10 @@ export default function MFStoreOS() {
                           {look.itemNames.map((item, i) => (<p key={i} className="text-xs font-bold text-zinc-400 flex items-center gap-2"><CheckCircle2 size={14} className="text-pink-500" /> {item}</p>))}
                         </div>
                       </div>
-                      <button onClick={() => handleApplyLookToPOS(look)} className="w-full py-3.5 bg-black border border-pink-500/30 hover:bg-pink-600 hover:text-black hover:border-pink-600 text-pink-400 rounded-2xl font-black text-xs flex items-center justify-center gap-2 btn-press transition-colors"><ShoppingBag size={16} /> Lançar no PDV</button>
+                      <div className="flex gap-2">
+                        <button onClick={async () => { await deleteDoc(doc(db, 'artifacts', appId, 'looks', look.id)); showToast('Look removido!'); }} className="p-3.5 bg-black border border-zinc-800 hover:bg-red-900/30 hover:border-red-500/50 text-red-500 rounded-2xl btn-press transition-colors"><Trash2 size={16} /></button>
+                        <button onClick={() => handleApplyLookToPOS(look)} className="flex-1 py-3.5 bg-black border border-pink-500/30 hover:bg-pink-600 hover:text-black hover:border-pink-600 text-pink-400 rounded-2xl font-black text-xs flex items-center justify-center gap-2 btn-press transition-colors"><ShoppingBag size={16} /> Lançar no PDV</button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1303,7 +1351,7 @@ export default function MFStoreOS() {
               </div>
               <div className="w-full max-w-[370px] h-[740px] bg-black rounded-[3rem] border-[10px] border-[#1a1a1a] shadow-[0_0_30px_rgba(236,72,153,0.1)] relative overflow-hidden flex flex-col hover-lift">
                 <div className="absolute top-0 inset-x-0 h-6 bg-[#1a1a1a] rounded-b-3xl w-40 mx-auto z-50"></div>
-                <div className="pt-10 pb-4 px-6 bg-[#121212] text-white text-center border-b border-pink-500/10"><div className="w-20 h-20 rounded-2xl mx-auto flex items-center justify-center bg-black overflow-hidden mb-2 shadow-[0_0_15px_rgba(236,72,153,0.2)] border border-pink-500/20"><img src="https://i.ibb.co/sK6W4qD/mf-store-logo.jpg" alt="MF Store Logo" className="w-full h-full object-cover" /></div><h3 className="font-black text-lg uppercase tracking-wider mt-2">MF Store</h3></div>
+                <div className="pt-10 pb-4 px-6 bg-[#121212] text-white text-center border-b border-pink-500/10"><div className="w-20 h-20 rounded-2xl mx-auto flex items-center justify-center bg-black overflow-hidden mb-2 shadow-[0_0_15px_rgba(236,72,153,0.2)] border border-pink-500/20"><img src="/logo.jpg" alt="MF Store Logo" className="w-full h-full object-cover" /></div><h3 className="font-black text-lg uppercase tracking-wider mt-2">MF Store</h3></div>
                 <div className="flex-1 overflow-y-auto p-3.5 bg-black custom-scrollbar">
                   <div className="grid grid-cols-2 gap-3">
                     {vitrineProducts.map(p => {
