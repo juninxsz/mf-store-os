@@ -151,6 +151,7 @@ export default function MFStoreOS() {
   const [isGridMode, setIsGridMode] = useState(false);
   const [gridStocks, setGridStocks] = useState({ PP: 0, P: 3, M: 5, G: 4, GG: 2 });
   const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
   const [sangriaAmount, setSangriaAmount] = useState('');
   const [sangriaReason, setSangriaReason] = useState('');
   const [openRegisterAmount, setOpenRegisterAmount] = useState('');
@@ -335,28 +336,37 @@ export default function MFStoreOS() {
 
   const handleAddProduct = async (e) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || isSavingProduct) return;
+    setIsSavingProduct(true);
+    
     try {
       if (isGridMode) {
         const sizesToCreate = Object.entries(gridStocks).filter(([, qty]) => parseInt(qty) > 0);
-        if (sizesToCreate.length === 0) { showToast('Coloque pelo menos 1 tamanho!', 'error'); return; }
-        for (const [sz, qty] of sizesToCreate) {
-          await addDoc(collection(db, 'artifacts', appId, 'products'), {
+        if (sizesToCreate.length === 0) { showToast('Coloque pelo menos 1 tamanho!', 'error'); setIsSavingProduct(false); return; }
+        
+        const promises = sizesToCreate.map(([sz, qty]) => {
+          return addDoc(collection(db, 'artifacts', appId, 'products'), {
             name: newProduct.name, category: newProduct.category, price: parseFloat(newProduct.price), cost: parseFloat(newProduct.cost),
             size: sz, stock: parseInt(qty), image: newProduct.image || null, isVitrine: newProduct.isVitrine, createdAt: Date.now()
           });
-        }
-        showToast(`Grade salva!`);
+        });
+        await Promise.all(promises);
+        showToast(`Grade salva com sucesso!`);
       } else {
         await addDoc(collection(db, 'artifacts', appId, 'products'), {
           name: newProduct.name, category: newProduct.category, price: parseFloat(newProduct.price), cost: parseFloat(newProduct.cost),
           size: newProduct.size, stock: parseInt(newProduct.stock), image: newProduct.image || null, isVitrine: newProduct.isVitrine, createdAt: Date.now()
         });
-        showToast('Peça salva!');
+        showToast('Peça salva com sucesso!');
       }
       setIsProductModalOpen(false);
       setNewProduct({ name: '', category: 'Camisetas', price: '', cost: '', size: 'M', stock: 10, image: null, isVitrine: true });
-    } catch (e) { showToast('Erro', 'error'); }
+      setGridStocks({ PP: 0, P: 3, M: 5, G: 4, GG: 2 });
+    } catch (e) { 
+      showToast('Erro ao salvar produto.', 'error'); 
+    } finally {
+      setIsSavingProduct(false);
+    }
   };
 
   const handleDeleteProduct = (id, name) => {
@@ -512,7 +522,7 @@ export default function MFStoreOS() {
     let msg = `🛍️ *MF Store - Recibo Digital*\n\nOlá ${sale.customerName}! Muito obrigado pela preferência.\n\n*Compra:*\n`;
     sale.items.forEach(i => { msg += `- ${i.quantity}x ${i.name} (Tam: ${i.size}) : ${formatCurrency(i.price * i.quantity)}\n`; });
     if (sale.discountValue > 0) msg += `\nDesconto: - ${formatCurrency(sale.discountValue)}`;
-    msg += `\n*TOTAL: ${formatCurrency(sale.total)}*\n\n🎁 *Ganhou ${formatCurrency(cashback)} de CASHBACK* na próxima compra!\n\nVolte sempre! ✨`;
+    msg += `\n*TOTAL: ${formatCurrency(sale.total)}*\n\n🎁 *Você ganhou ${formatCurrency(cashback)} de CASHBACK* para usar na sua próxima compra!\n\nVolte sempre! ✨`;
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`;
   };
 
@@ -601,7 +611,7 @@ export default function MFStoreOS() {
     setVitrineCart(prev => {
       const exists = prev.find(i => i.id === product.id);
       if (exists) {
-        if (exists.quantity >= product.stock) { return prev; }
+        if (exists.quantity >= product.stock) { showToast('Estoque atingido!', 'error'); return prev; }
         return prev.map(i => i.id === product.id ? { ...i, quantity: i.quantity + 1 } : i);
       }
       return [...prev, { ...product, quantity: 1 }];
@@ -841,7 +851,7 @@ export default function MFStoreOS() {
                 <div className="flex flex-col gap-3 mb-6">
                   <div className="relative flex-1">
                     <Search className="absolute left-4 top-3.5 text-pink-500/50" size={18} />
-                    <input type="text" placeholder="Buscar ou bipar código de barras..." value={posSearchQuery} onChange={(e) => setPosSearchQuery(e.target.value)} ref={posSearchRef}
+                    <input type="text" placeholder="Buscar peça ou usar leitor de código de barras..." value={posSearchQuery} onChange={(e) => setPosSearchQuery(e.target.value)} ref={posSearchRef}
                       className="w-full pl-11 pr-4 py-3 bg-[#121212] border border-pink-500/20 rounded-2xl focus:ring-2 focus:ring-pink-500 shadow-sm font-medium transition-shadow text-white placeholder-zinc-600" />
                   </div>
                   <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1">
@@ -866,7 +876,7 @@ export default function MFStoreOS() {
                           <div className="absolute top-2 right-2 bg-black/80 backdrop-blur border border-pink-500/30 px-2 py-1 rounded-md text-xs font-black text-white">{p.size}</div>
                         </div>
                         <div className="p-3 flex-1 flex flex-col">
-                          <p className="font-bold text-white text-sm leading-tight mb-2 line-clamp-2">{p.name}</p>
+                          <p className="font-bold text-white text-sm line-clamp-2 leading-tight mb-1">{p.name}</p>
                           <div className="mt-auto flex justify-between items-end">
                             <span className="font-black text-pink-400">{formatCurrency(p.price)}</span>
                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${p.stock <= 3 ? 'bg-red-900/50 text-red-400 border border-red-500/30' : 'bg-black border border-zinc-800 text-zinc-400'}`}>{p.stock} un</span>
@@ -878,7 +888,6 @@ export default function MFStoreOS() {
                 </div>
               </div>
 
-              {/* O Container do Carrinho que causava o conflito foi ajustado aqui (h-auto no mobile, sticky no PC) */}
               <div className="w-full xl:w-[400px] bg-[#121212] rounded-3xl shadow-2xl shadow-black border border-pink-500/20 flex flex-col flex-shrink-0 animate-slide-in-right h-auto xl:sticky xl:top-4 xl:h-[calc(100vh-100px)]">
                 <div className="p-5 bg-pink-600 text-black rounded-t-3xl relative overflow-hidden">
                   <div className="flex items-center justify-between relative z-10">
@@ -1035,7 +1044,14 @@ export default function MFStoreOS() {
                               {p.isVitrine ? <ToggleRight size={28} className="text-pink-500" /> : <ToggleLeft size={28} />}
                             </button>
                           </td>
-                          <td className="p-4 text-center">
+                          <td className="p-4 text-center flex items-center justify-center gap-3">
+                            <button onClick={() => {
+                              const newStock = prompt(`Novo estoque para ${p.name} (${p.size}):`, p.stock);
+                              if (newStock !== null && !isNaN(newStock)) {
+                                updateDoc(doc(db, 'artifacts', appId, 'products', p.id), { stock: parseInt(newStock) });
+                                showToast('Estoque atualizado!');
+                              }
+                            }} className="text-zinc-600 hover:text-emerald-500 transition-colors btn-press" title="Ajustar Estoque"><PackageSearch size={18} /></button>
                             <button onClick={() => handleDeleteProduct(p.id, p.name)} className="text-zinc-600 hover:text-red-500 transition-colors btn-press"><Trash2 size={18} /></button>
                           </td>
                         </tr>
@@ -1411,7 +1427,7 @@ export default function MFStoreOS() {
                 {!isGridMode && (<div><label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Estoque</label><input required type="number" value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: e.target.value})} className="w-full bg-black border border-zinc-800 text-white rounded-xl px-4 py-3 font-bold focus:border-pink-500" /></div>)}
                 <div className="flex items-center gap-3 pt-6"><input type="checkbox" id="vitrine" checked={newProduct.isVitrine} onChange={e => setNewProduct({...newProduct, isVitrine: e.target.checked})} className="w-5 h-5 rounded text-pink-600 bg-black border-zinc-700" /><label htmlFor="vitrine" className="text-sm font-bold text-zinc-400 cursor-pointer">Mostrar na Vitrine Digital</label></div>
               </div>
-              <button type="submit" disabled={isProcessingImage} className="w-full py-4 mt-4 rounded-xl font-black text-black bg-pink-600 hover:bg-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.4)] btn-press">Salvar Produto</button>
+              <button type="submit" disabled={isProcessingImage || isSavingProduct} className="w-full py-4 mt-4 rounded-xl font-black text-black bg-pink-600 hover:bg-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.4)] btn-press">{isSavingProduct ? 'Salvando...' : 'Salvar Produto'}</button>
             </form>
           </div>
         </div>
