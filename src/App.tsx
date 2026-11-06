@@ -151,7 +151,7 @@ export default function MFStoreOS() {
   // Vitrine Digital Interactive States
   const [vitrineCart, setVitrineCart] = useState([]);
   const [vitrineCustomerName, setVitrineCustomerName] = useState('');
-  const [storeWhatsapp, setStoreWhatsapp] = useState('14999999999');
+  const [storeWhatsapp, setStoreWhatsapp] = useState('14997815723');
 
   // Inventory States
   const [inventorySearchQuery, setInventorySearchQuery] = useState('');
@@ -1551,7 +1551,7 @@ export default function MFStoreOS() {
                       <MessageCircle size={18} className="text-emerald-500" />
                       <span className="block text-xs font-bold text-zinc-500 uppercase tracking-wider">Receber pedidos no número:</span>
                     </div>
-                    <input type="text" value={storeWhatsapp} onChange={e => setStoreWhatsapp(e.target.value)} className="w-full text-xl font-black text-white bg-transparent border-b border-zinc-800 focus:border-pink-500 focus:outline-none focus:ring-0 px-1 py-2 transition-colors" placeholder="Ex: 14999999999" />
+                    <input type="text" value={storeWhatsapp} onChange={e => setStoreWhatsapp(e.target.value)} className="w-full text-xl font-black text-white bg-transparent border-b border-zinc-800 focus:border-pink-500 focus:outline-none focus:ring-0 px-1 py-2 transition-colors" placeholder="Ex: 14997815723" />
                     <p className="text-[10px] text-zinc-600 font-medium">As clientes serão direcionadas para este WhatsApp ao finalizar a compra no catálogo.</p>
                  </div>
                  
