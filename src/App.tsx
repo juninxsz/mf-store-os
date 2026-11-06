@@ -34,7 +34,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'mf-store-os-premium';
 
-// --- CUSTOM STYLES & MOTION DESIGN (DARK PINK THEME) ---
+// --- CUSTOM STYLES & MOTION DESIGN ---
 const customStyles = `
   @keyframes fadeInUp {
     from { opacity: 0; transform: translateY(20px) scale(0.98); }
@@ -48,6 +48,10 @@ const customStyles = `
     from { opacity: 0; backdrop-filter: blur(0px); }
     to { opacity: 1; backdrop-filter: blur(12px); }
   }
+  @keyframes pulseSoft {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+  }
   @keyframes scaleIn {
     0% { opacity: 0; transform: scale(0.92) translateY(15px); }
     100% { opacity: 1; transform: scale(1) translateY(0); }
@@ -55,7 +59,15 @@ const customStyles = `
   .animate-fade-in-up { animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
   .animate-slide-in-right { animation: slideInRight 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
   .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+  .animate-pulse-soft { animation: pulseSoft 2s infinite ease-in-out; }
   .animate-modal { animation: scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+  @media print {
+    body * { visibility: hidden !important; }
+    #printable-area, #printable-area * { visibility: visible !important; }
+    #printable-area { position: absolute; left: 0; top: 0; width: 100%; background: white !important; color: black !important; border: none !important; box-shadow: none !important; }
+    #printable-area h3, #printable-area p, #printable-area span { color: black !important; }
+    .no-print { display: none !important; }
+  }
   
   .btn-press { transition: all 0.15s ease; }
   .btn-press:active { transform: scale(0.94); }
@@ -168,7 +180,9 @@ export default function MFStoreOS() {
 
   useEffect(() => {
     const initAuth = async () => {
-      try { await signInAnonymously(auth); } catch (error) { console.error("Auth error:", error); }
+      try {
+        await signInAnonymously(auth);
+      } catch (error) { console.error("Auth error:", error); }
     };
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, setUser);
@@ -521,10 +535,10 @@ export default function MFStoreOS() {
     if (!sale || !sale.customerPhone) return '#';
     const cleanPhone = sale.customerPhone.replace(/\D/g, '');
     const cashback = sale.total * 0.05; 
-    let msg = `🛍️ *MF Store - Recibo Digital* 🛍️\n\nOlá ${sale.customerName}! Muito obrigado pela preferência.\n\n*Compra:*\n`;
+    let msg = `🛍️ *MF Store - Recibo Digital*\n\nOlá ${sale.customerName}! Muito obrigado pela preferência.\n\n*Compra:*\n`;
     sale.items.forEach(i => { msg += `- ${i.quantity}x ${i.name} (Tam: ${i.size}) : ${formatCurrency(i.price * i.quantity)}\n`; });
     if (sale.discountValue > 0) msg += `\nDesconto: - ${formatCurrency(sale.discountValue)}`;
-    msg += `\n*TOTAL: ${formatCurrency(sale.total)}*\n\n🎁 *Você ganhou ${formatCurrency(cashback)} de CASHBACK* para usar na sua próxima compra!\n\nVolte sempre! ✨`;
+    msg += `\n*TOTAL: ${formatCurrency(sale.total)}*\n\n🎁 *Ganhou ${formatCurrency(cashback)} de CASHBACK* na próxima compra!\n\nVolte sempre! ✨`;
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`;
   };
 
@@ -619,7 +633,6 @@ export default function MFStoreOS() {
       return [...prev, { ...product, quantity: 1 }];
     });
   };
-  
   const vitrineTotal = vitrineCart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   const getVitrineOrderWhatsAppLink = () => {
     const cleanPhone = storeWhatsapp.replace(/\D/g, '');
@@ -640,6 +653,81 @@ export default function MFStoreOS() {
       {icon}<span>{label}</span>
     </button>
   );
+
+  if (!isAuthenticated && !isCatalogView) {
+    return (
+      <div className="min-h-screen bg-black font-sans text-white flex items-center justify-center p-4 relative overflow-hidden selection:bg-pink-500/30">
+        <style>{customStyles}</style>
+        
+        {/* Background Effects */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-pink-600/10 blur-[120px] rounded-full pointer-events-none"></div>
+        <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-pink-900/10 blur-[120px] rounded-full pointer-events-none"></div>
+        
+        <div className="w-full max-w-md z-10 animate-fade-in-up">
+          <div className="bg-[#121212] rounded-[2.5rem] shadow-2xl p-10 border border-pink-500/20 relative">
+            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-pink-500 to-transparent opacity-50"></div>
+            
+            <div className="flex flex-col items-center mb-10">
+              <div className="w-24 h-24 rounded-3xl overflow-hidden mb-5 border-2 border-pink-500/30 shadow-[0_0_30px_rgba(236,72,153,0.15)] bg-black flex items-center justify-center">
+                <img src="/logo.jpg" alt="MF Store Logo" className="w-full h-full object-cover" />
+              </div>
+              <h1 className="text-2xl font-black tracking-widest text-white uppercase">MF Store</h1>
+              <p className="text-xs uppercase font-black tracking-[0.25em] text-pink-500 mt-1">Premium OS</p>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div>
+                <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 pl-2">Usuário</label>
+                <div className="relative">
+                  <User className="absolute left-4 top-3.5 text-pink-500/50" size={18} />
+                  <input 
+                    type="text" 
+                    value={loginForm.user}
+                    onChange={e => setLoginForm({...loginForm, user: e.target.value})}
+                    placeholder="Digite o utilizador"
+                    className="w-full bg-black border border-zinc-800 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-white placeholder-zinc-700 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-all outline-none"
+                    required
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 pl-2">Senha</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-3.5 text-pink-500/50" size={18} />
+                  <input 
+                    type="password" 
+                    value={loginForm.password}
+                    onChange={e => setLoginForm({...loginForm, password: e.target.value})}
+                    placeholder="••••••••"
+                    className="w-full bg-black border border-zinc-800 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-white placeholder-zinc-700 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-all outline-none tracking-widest"
+                    required
+                  />
+                </div>
+              </div>
+
+              {loginError && (
+                <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-xl flex items-center gap-2 animate-modal">
+                  <AlertCircle size={16} className="text-red-500 flex-shrink-0" />
+                  <p className="text-xs font-bold text-red-400">Usuário ou senha incorretos. Tente novamente.</p>
+                </div>
+              )}
+
+              <button 
+                type="submit" 
+                className="w-full mt-2 py-4 bg-pink-600 hover:bg-pink-500 text-black font-black uppercase tracking-widest rounded-2xl shadow-[0_0_20px_rgba(236,72,153,0.3)] btn-press transition-all flex items-center justify-center gap-2"
+              >
+                Acessar Sistema <ArrowLeftRight size={16} className="rotate-180" />
+              </button>
+            </form>
+          </div>
+          <p className="text-center text-[10px] font-bold text-zinc-600 uppercase tracking-widest mt-8">
+            Sistema Restrito • MF Store 2026
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (isCatalogView) {
     return (
@@ -781,81 +869,6 @@ export default function MFStoreOS() {
     );
   }
 
-  if (!isAuthenticated && !isCatalogView) {
-    return (
-      <div className="min-h-screen bg-black font-sans text-white flex items-center justify-center p-4 relative overflow-hidden selection:bg-pink-500/30">
-        <style>{customStyles}</style>
-        
-        {/* Background Effects */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-pink-600/10 blur-[120px] rounded-full pointer-events-none"></div>
-        <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-pink-900/10 blur-[120px] rounded-full pointer-events-none"></div>
-        
-        <div className="w-full max-w-md z-10 animate-fade-in-up">
-          <div className="bg-[#121212] rounded-[2.5rem] shadow-2xl p-10 border border-pink-500/20 relative">
-            <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-pink-500 to-transparent opacity-50"></div>
-            
-            <div className="flex flex-col items-center mb-10">
-              <div className="w-24 h-24 rounded-3xl overflow-hidden mb-5 border-2 border-pink-500/30 shadow-[0_0_30px_rgba(236,72,153,0.15)] bg-black flex items-center justify-center">
-                <img src="/logo.jpg" alt="MF Store Logo" className="w-full h-full object-cover" />
-              </div>
-              <h1 className="text-2xl font-black tracking-widest text-white uppercase">MF Store</h1>
-              <p className="text-xs uppercase font-black tracking-[0.25em] text-pink-500 mt-1">Premium OS</p>
-            </div>
-
-            <form onSubmit={handleLogin} className="space-y-5">
-              <div>
-                <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 pl-2">Usuário</label>
-                <div className="relative">
-                  <User className="absolute left-4 top-3.5 text-pink-500/50" size={18} />
-                  <input 
-                    type="text" 
-                    value={loginForm.user}
-                    onChange={e => setLoginForm({...loginForm, user: e.target.value})}
-                    placeholder="Digite o utilizador"
-                    className="w-full bg-black border border-zinc-800 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-white placeholder-zinc-700 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-all outline-none"
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2 pl-2">Senha</label>
-                <div className="relative">
-                  <Lock className="absolute left-4 top-3.5 text-pink-500/50" size={18} />
-                  <input 
-                    type="password" 
-                    value={loginForm.password}
-                    onChange={e => setLoginForm({...loginForm, password: e.target.value})}
-                    placeholder="••••••••"
-                    className="w-full bg-black border border-zinc-800 rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-white placeholder-zinc-700 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 transition-all outline-none tracking-widest"
-                    required
-                  />
-                </div>
-              </div>
-
-              {loginError && (
-                <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-xl flex items-center gap-2 animate-modal">
-                  <AlertCircle size={16} className="text-red-500 flex-shrink-0" />
-                  <p className="text-xs font-bold text-red-400">Usuário ou senha incorretos. Tente novamente.</p>
-                </div>
-              )}
-
-              <button 
-                type="submit" 
-                className="w-full mt-2 py-4 bg-pink-600 hover:bg-pink-500 text-black font-black uppercase tracking-widest rounded-2xl shadow-[0_0_20px_rgba(236,72,153,0.3)] btn-press transition-all flex items-center justify-center gap-2"
-              >
-                Acessar Sistema <ArrowLeftRight size={16} className="rotate-180" />
-              </button>
-            </form>
-          </div>
-          <p className="text-center text-[10px] font-bold text-zinc-600 uppercase tracking-widest mt-8">
-            Sistema Restrito • MF Store 2026
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-black font-sans text-white flex overflow-hidden selection:bg-pink-500/30">
       <style>{customStyles}</style>
@@ -885,7 +898,7 @@ export default function MFStoreOS() {
           {renderSidebarItem('expenses', <TrendingDown size={20} />, 'Despesas (DRE)')}
           {renderSidebarItem('audit', <ShieldCheck size={20} />, 'Auditoria')}
           
-          <button onClick={handleLogout} className="w-full flex items-center space-x-3 px-4 py-3.5 rounded-2xl transition-all duration-300 font-medium text-red-400 hover:bg-red-900/20 hover:text-red-300 mt-4">
+          <button onClick={handleLogout} className="w-full flex items-center space-x-3 px-4 py-3.5 rounded-2xl transition-all duration-300 font-medium text-red-400 hover:bg-red-900/20 hover:text-red-300 mt-4 no-print">
             <Lock size={20} /><span>Sair (Logout)</span>
           </button>
           <div className="pt-4 pb-2"><p className="text-xs font-bold text-zinc-600 uppercase tracking-widest pl-4">Digital</p></div>
@@ -895,7 +908,7 @@ export default function MFStoreOS() {
 
       {/* --- MAIN CONTENT --- */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative bg-[#050505]">
-        <header className="lg:hidden glass-panel p-3 flex flex-col gap-2 sticky top-0 z-20 bg-black/90">
+        <header className="lg:hidden glass-panel p-3 flex flex-col gap-2 sticky top-0 z-20 bg-black/90 no-print">
           <div className="flex justify-between items-center px-2">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl overflow-hidden border border-pink-500/30 bg-black flex items-center justify-center">
@@ -929,7 +942,7 @@ export default function MFStoreOS() {
           {toast && (
             <div className={`fixed top-6 right-6 px-6 py-4 rounded-2xl shadow-2xl z-[100] flex items-center space-x-3 animate-fade-in-up border ${
               toast.type === 'error' ? 'bg-red-900/90 text-white border-red-500/50' : 'bg-pink-900/90 text-white border-pink-500/50'
-            }`}>
+            } no-print`}>
               {toast.type === 'error' ? <AlertCircle size={20} className="text-red-400" /> : <CheckCircle2 size={20} className="text-pink-300" />}
               <span className="font-semibold">{toast.message}</span>
             </div>
@@ -993,11 +1006,24 @@ export default function MFStoreOS() {
                 <div className="flex flex-col gap-3 mb-6">
                   <div className="relative flex-1">
                     <Search className="absolute left-4 top-3.5 text-pink-500/50" size={18} />
-                    <input type="text" placeholder="Buscar ou bipar código de barras..." value={posSearchQuery} onChange={(e) => setPosSearchQuery(e.target.value)} ref={posSearchRef}
+                    <input type="text" placeholder="Buscar ou bipar código de barras..." value={posSearchQuery} onChange={(e) => setPosSearchQuery(e.target.value)} onKeyDown={(e) => {
+                      if (e.key === 'Enter' && posSearchQuery.trim() !== '') {
+                        const query = posSearchQuery.trim().toUpperCase();
+                        const match = products.find(p => p.id.toUpperCase().startsWith(query) || p.name.toUpperCase() === query);
+                        if (match) {
+                          if (match.stock <= 0) { showToast('Produto esgotado!', 'error'); return; }
+                          addToCart(match);
+                          setPosSearchQuery('');
+                          showToast('Produto adicionado!');
+                        } else {
+                          showToast('Código não reconhecido!', 'error');
+                        }
+                      }
+                    }} ref={posSearchRef}
                       className="w-full pl-11 pr-4 py-3 bg-[#121212] border border-pink-500/20 rounded-2xl focus:ring-2 focus:ring-pink-500 shadow-sm font-medium transition-shadow text-white placeholder-zinc-600" />
                   </div>
                   <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1">
-                    {['Todas', 'Camisetas', 'Calças', 'Casacos', 'Vestidos', 'Acessórios'].map(cat => (
+                    {['Todas', ...Array.from(new Set(products.map(p => p.category || 'Outros')))].map(cat => (
                       <button key={cat} onClick={() => setPosCategoryFilter(cat)}
                         className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap btn-press border ${
                           posCategoryFilter === cat ? 'bg-pink-600 border-pink-500 text-black shadow-md shadow-pink-500/20' : 'bg-black text-zinc-400 border-zinc-800 hover:bg-zinc-900 hover:text-white'
@@ -1018,7 +1044,8 @@ export default function MFStoreOS() {
                           <div className="absolute top-2 right-2 bg-black/80 backdrop-blur border border-pink-500/30 px-2 py-1 rounded-md text-xs font-black text-white">{p.size}</div>
                         </div>
                         <div className="p-3 flex-1 flex flex-col">
-                          <p className="font-bold text-white text-sm line-clamp-2 leading-tight mb-2">{p.name}</p>
+                          <p className="font-bold text-white text-sm line-clamp-2 leading-tight mb-1">{p.name}</p>
+                          <p className="text-[9px] text-zinc-500 font-mono mb-2 uppercase tracking-widest">Cód: {p.id.substring(0,6)}</p>
                           <div className="mt-auto flex justify-between items-end">
                             <span className="font-black text-pink-400">{formatCurrency(p.price)}</span>
                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${p.stock <= 3 ? 'bg-red-900/50 text-red-400 border border-red-500/30' : 'bg-black border border-zinc-800 text-zinc-400'}`}>{p.stock} un</span>
@@ -1173,7 +1200,7 @@ export default function MFStoreOS() {
                             </div>
                             <div>
                               <p className="font-bold text-white text-sm truncate">{p.name}</p>
-                              <p className="text-[11px] font-medium text-zinc-500">{p.category}</p>
+                              <p onClick={() => { const newCat = prompt(`Nova categoria para ${p.name}:`, p.category); if (newCat && newCat.trim() !== '') { updateDoc(doc(db, 'artifacts', appId, 'products', p.id), { category: newCat.trim() }); showToast('Categoria atualizada!'); } }} className="text-[11px] font-medium text-zinc-400 hover:text-pink-400 cursor-pointer transition-colors" title="Clique para alterar a categoria">{p.category} ✎</p>
                             </div>
                           </td>
                           <td className="p-4"><span className="bg-black border border-zinc-800 px-2.5 py-1 rounded-md text-xs font-black text-white">{p.size}</span></td>
@@ -1297,7 +1324,7 @@ export default function MFStoreOS() {
                     <div key={sale.id} className="bg-[#121212] rounded-3xl p-6 shadow-sm border border-zinc-800 flex flex-col lg:flex-row justify-between gap-6 hover:border-pink-500/20 transition-colors">
                       <div className="space-y-3 flex-1">
                         <div className="flex flex-wrap items-center gap-3">
-                          <span className="px-3 py-1 bg-black text-white rounded-xl text-xs font-black uppercase">{sale.paymentMethod}</span>
+                          <span className="px-3 py-1 bg-black border border-zinc-700 text-pink-400 rounded-xl text-xs font-black uppercase">{sale.paymentMethod}</span>
                           <h4 className="font-black text-lg text-white">{sale.customerName}</h4>
                           <span className="text-xs font-bold text-zinc-500">{new Date(sale.timestamp).toLocaleString('pt-BR')}</span>
                           {sale.voucherCode && (<span className="text-xs bg-emerald-900/30 border border-emerald-500/30 text-emerald-400 font-bold px-2.5 py-1 rounded-lg">Usou Vale: {sale.voucherCode}</span>)}
@@ -1448,7 +1475,7 @@ export default function MFStoreOS() {
           {activeTab === 'expenses' && (
             <div className="animate-fade-in-up">
               <div className="flex items-center gap-4 border-b border-zinc-800 pb-6 mb-8">
-                <div className="w-12 h-12 bg-pink-900/20 text-pink-500 border border-pink-500/30 rounded-2xl flex items-center justify-center"><Calculator size={24} /></div>
+                <div className="w-12 h-12 bg-rose-900/20 text-rose-500 border border-rose-500/30 rounded-2xl flex items-center justify-center"><Calculator size={24} /></div>
                 <div><h2 className="text-3xl font-black text-white">Gestão de Despesas</h2><p className="text-zinc-500 font-medium">Controle os custos fixos e variáveis da loja.</p></div>
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1471,7 +1498,7 @@ export default function MFStoreOS() {
                        <thead className="bg-black/50 border-b border-zinc-800"><tr className="text-pink-500 text-xs uppercase tracking-wider"><th className="p-4 font-black">Data</th><th className="p-4 font-black">Descrição</th><th className="p-4 font-black">Tipo</th><th className="p-4 font-black">Valor</th><th className="p-4 font-black text-center">Ações</th></tr></thead>
                        <tbody className="divide-y divide-zinc-800">
                          {expenses.length === 0 ? (<tr><td colSpan="5" className="p-8 text-center text-zinc-600 font-medium">Nenhuma despesa registada.</td></tr>) : (
-                           expenses.map(exp => (<tr key={exp.id} className="hover:bg-zinc-900/50"><td className="p-4 text-sm font-medium text-zinc-400">{new Date(exp.timestamp).toLocaleDateString('pt-BR')}</td><td className="p-4 text-sm font-bold text-white">{exp.description}</td><td className="p-4"><span className={`px-2 py-1 rounded text-[10px] font-black uppercase border ${exp.type === 'Fixa' ? 'bg-zinc-900 text-zinc-400 border-zinc-700' : 'bg-pink-900/20 text-pink-400 border-pink-500/30'}`}>{exp.type}</span></td><td className="p-4 text-sm font-black text-pink-500">{formatCurrency(exp.amount)}</td><td className="p-4 text-center"><button onClick={() => handleDeleteExpense(exp.id, exp.description)} className="text-zinc-600 hover:text-red-500 btn-press"><Trash2 size={16}/></button></td></tr>))
+                           expenses.map(exp => (<tr key={exp.id} className="hover:bg-zinc-900/50"><td className="p-4 text-sm font-medium text-zinc-400">{new Date(exp.timestamp).toLocaleDateString('pt-BR')}</td><td className="p-4 text-sm font-bold text-white">{exp.description}</td><td className="p-4"><span className={`px-2 py-1 rounded text-[10px] font-black uppercase border ${exp.type === 'Fixa' ? 'bg-zinc-900 text-zinc-400 border-zinc-700' : 'bg-pink-900/20 text-pink-400 border-pink-500/30'}`}>{exp.type}</span></td><td className="p-4 text-sm font-black text-rose-500">{formatCurrency(exp.amount)}</td><td className="p-4 text-center"><button onClick={() => handleDeleteExpense(exp.id, exp.description)} className="text-zinc-600 hover:text-red-500 btn-press"><Trash2 size={16}/></button></td></tr>))
                          )}
                        </tbody>
                      </table>
@@ -1555,6 +1582,19 @@ export default function MFStoreOS() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div><label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Nome</label><input required type="text" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} className="w-full bg-black border border-zinc-800 text-white rounded-xl px-4 py-3 font-bold focus:border-pink-500" /></div>
                 <div>
+                  <label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Categoria</label>
+                  <select value={newProduct.category || "Outros"} onChange={e => setNewProduct({...newProduct, category: e.target.value})} className="w-full bg-black border border-zinc-800 text-white rounded-xl px-4 py-3 font-bold focus:border-pink-500">
+                    <option value="Camisetas">Camisetas / Tops</option>
+                    <option value="Calças">Calças / Leggings</option>
+                    <option value="Casacos">Casacos / Blusas</option>
+                    <option value="Vestidos">Vestidos / Saias</option>
+                    <option value="Macacões">Macacões / Macaquinhos</option>
+                    <option value="Conjuntos">Conjuntos</option>
+                    <option value="Acessórios">Acessórios / Bolsas</option>
+                    <option value="Outros">Outros</option>
+                  </select>
+                </div>
+                <div>
                   <div className="flex justify-between items-center mb-1"><label className="block text-xs font-bold text-zinc-500 uppercase">Tamanho</label><button type="button" onClick={() => setIsGridMode(!isGridMode)} className="text-[10px] font-black px-2 py-0.5 rounded-md bg-pink-900/20 text-pink-400 border border-pink-500/20 btn-press">{isGridMode ? 'Grade Ativa' : 'Ativar Grade'}</button></div>
                   {!isGridMode ? (<select value={newProduct.size} onChange={e => setNewProduct({...newProduct, size: e.target.value})} className="w-full bg-black border border-zinc-800 text-white rounded-xl px-4 py-3 font-bold focus:border-pink-500"><option>U</option><option>PP</option><option>P</option><option>M</option><option>G</option><option>GG</option></select>) : (
                     <div className="grid grid-cols-5 gap-1.5 bg-black p-2 rounded-xl border border-zinc-800">{Object.keys(gridStocks).map(sz => (<div key={sz} className="text-center"><span className="text-[10px] font-black text-pink-500 block mb-0.5">{sz}</span><input type="number" min="0" value={gridStocks[sz]} onChange={e => setGridStocks({ ...gridStocks, [sz]: e.target.value })} className="w-full bg-[#121212] border border-zinc-700 rounded-lg py-1 text-center text-xs font-black text-white focus:border-pink-500" /></div>))}</div>
@@ -1611,22 +1651,23 @@ export default function MFStoreOS() {
       )}
 
       {isReceiptModalOpen && lastSaleData && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+        <div id="printable-area" className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
           <div className="bg-[#121212] rounded-[2rem] w-full max-w-sm shadow-2xl animate-modal text-center p-8 border border-emerald-500/20">
             <div className="w-20 h-20 bg-emerald-900/20 border border-emerald-500/30 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-6"><CheckCircle2 size={40} /></div>
             <h3 className="text-2xl font-black text-white mb-2">Venda Concluída!</h3><p className="text-zinc-400 font-medium mb-8">Fidelize a cliente enviando o recibo e o cashback por WhatsApp.</p>
-            <a href={getWhatsAppLink(lastSaleData)} target="_blank" rel="noreferrer" onClick={() => setIsReceiptModalOpen(false)} className="w-full py-4 rounded-xl font-black text-black bg-emerald-500 hover:bg-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.4)] flex items-center justify-center gap-2 mb-3 btn-press"><Send size={20} /> Enviar Recibo WhatsApp</a>
-            <button onClick={() => setIsReceiptModalOpen(false)} className="w-full py-3 rounded-xl font-bold text-zinc-500 hover:text-white hover:bg-zinc-900 btn-press">Pular (Novo Cliente)</button>
+            <a href={getWhatsAppLink(lastSaleData)} target="_blank" rel="noreferrer" onClick={() => setIsReceiptModalOpen(false)} className="w-full py-4 rounded-xl font-black text-black bg-emerald-500 hover:bg-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.4)] flex items-center justify-center gap-2 mb-3 btn-press no-print"><Send size={20} /> Enviar Recibo WhatsApp</a>
+            <button onClick={() => window.print()} className="w-full py-4 rounded-xl font-black text-black bg-white hover:bg-zinc-200 shadow-[0_0_15px_rgba(255,255,255,0.2)] flex items-center justify-center gap-2 mb-3 btn-press no-print"><Printer size={20} /> Imprimir Recibo</button>
+            <button onClick={() => setIsReceiptModalOpen(false)} className="w-full py-3 rounded-xl font-bold text-zinc-500 hover:text-white hover:bg-zinc-900 btn-press no-print">Pular (Novo Cliente)</button>
           </div>
         </div>
       )}
 
       {isLabelModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-          <div className="bg-[#121212] rounded-[2rem] w-full max-w-3xl h-[80vh] flex flex-col shadow-2xl border border-pink-500/20 animate-modal">
+          <div id="printable-area" className="bg-[#121212] rounded-[2rem] w-full max-w-3xl h-[80vh] flex flex-col shadow-2xl border border-pink-500/20 animate-modal">
             <div className="p-6 border-b border-zinc-800 flex justify-between items-center bg-black/50 rounded-t-[2rem]">
               <div className="flex items-center gap-3"><Printer className="text-pink-500"/><h3 className="text-2xl font-black text-white">Etiquetas de Código de Barras</h3></div>
-              <button onClick={() => setIsLabelModalOpen(false)} className="p-2 hover:bg-zinc-900 rounded-full text-zinc-400 btn-press"><X size={20}/></button>
+              <button onClick={() => setIsLabelModalOpen(false)} className="p-2 hover:bg-zinc-900 rounded-full text-zinc-400 btn-press no-print"><X size={20}/></button>
             </div>
             <div className="flex-1 overflow-y-auto p-8 bg-black custom-scrollbar">
               <div className="bg-white p-8 mx-auto max-w-2xl min-h-[500px]">
@@ -1638,7 +1679,7 @@ export default function MFStoreOS() {
               </div>
             </div>
             <div className="p-6 border-t border-zinc-800 text-right bg-[#121212] rounded-b-[2rem]">
-              <button onClick={() => showToast('Impressão térmica iniciada!')} className="bg-pink-600 text-black px-8 py-3 rounded-xl font-black hover:bg-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.3)] btn-press flex items-center gap-2 inline-flex"><Printer size={18} /> Imprimir PDF</button>
+              <button onClick={() => window.print()} className="bg-pink-600 text-black px-8 py-3 rounded-xl font-black hover:bg-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.3)] btn-press flex items-center gap-2 inline-flex no-print"><Printer size={18} /> Imprimir PDF</button>
             </div>
           </div>
         </div>
