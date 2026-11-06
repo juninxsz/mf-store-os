@@ -160,6 +160,8 @@ export default function MFStoreOS() {
   const [pinAction, setPinAction] = useState(null);
   
   // Login State
+  const [isCatalogView] = useState(() => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('catalogo') === 'true');
+  const [isPublicCartOpen, setIsPublicCartOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('mfstore_auth') === 'true');
   const [loginForm, setLoginForm] = useState({ user: '', password: '' });
   const [loginError, setLoginError] = useState(false);
@@ -519,7 +521,7 @@ export default function MFStoreOS() {
     if (!sale || !sale.customerPhone) return '#';
     const cleanPhone = sale.customerPhone.replace(/\D/g, '');
     const cashback = sale.total * 0.05; 
-    let msg = `🛍️ *MF Store - Recibo Digital*\n\nOlá ${sale.customerName}! Muito obrigado pela preferência.\n\n*Compra:*\n`;
+    let msg = `🛍️ *MF Store - Recibo Digital* 🛍️\n\nOlá ${sale.customerName}! Muito obrigado pela preferência.\n\n*Compra:*\n`;
     sale.items.forEach(i => { msg += `- ${i.quantity}x ${i.name} (Tam: ${i.size}) : ${formatCurrency(i.price * i.quantity)}\n`; });
     if (sale.discountValue > 0) msg += `\nDesconto: - ${formatCurrency(sale.discountValue)}`;
     msg += `\n*TOTAL: ${formatCurrency(sale.total)}*\n\n🎁 *Você ganhou ${formatCurrency(cashback)} de CASHBACK* para usar na sua próxima compra!\n\nVolte sempre! ✨`;
@@ -621,14 +623,14 @@ export default function MFStoreOS() {
   const vitrineTotal = vitrineCart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
   const getVitrineOrderWhatsAppLink = () => {
     const cleanPhone = storeWhatsapp.replace(/\D/g, '');
-    let msg = `🛍️ *Novo Pedido - Vitrine Digital*\n\n*Cliente:* ${vitrineCustomerName || 'Instagram'}\n\n*Peças:*\n`;
-    vitrineCart.forEach(i => { msg += `• ${i.quantity}x ${i.name} - ${formatCurrency(i.price * i.quantity)}\n`; });
-    msg += `\n*Total: ${formatCurrency(vitrineTotal)}*`;
+    let msg = `🛍️ *Novo Pedido - Catálogo MF Store*\n\n*Cliente:* ${vitrineCustomerName || 'Cliente Online'}\n\n*Peças selecionadas:*\n`;
+    vitrineCart.forEach(i => { msg += `• ${i.quantity}x ${i.name} (Tam: ${i.size}) - ${formatCurrency(i.price * i.quantity)}\n`; });
+    msg += `\n*Total do Pedido: ${formatCurrency(vitrineTotal)}*\n\nGostaria de confirmar a disponibilidade destas peças! ✨`;
     return `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`;
   };
   const sendVitrineOrderToPOS = () => {
     if (vitrineCart.length === 0) return;
-    setCart(vitrineCart); if (vitrineCustomerName) setCustomerName(vitrineCustomerName); setVitrineCart([]); setVitrineCustomerName(''); setActiveTab('pos'); showToast('Importado!');
+    setCart(vitrineCart); if (vitrineCustomerName) setCustomerName(vitrineCustomerName); setVitrineCart([]); setVitrineCustomerName(''); setActiveTab('pos'); showToast('Pedido importado!');
   };
 
   const renderSidebarItem = (id, icon, label) => (
@@ -639,7 +641,147 @@ export default function MFStoreOS() {
     </button>
   );
 
-  if (!isAuthenticated) {
+  if (isCatalogView) {
+    return (
+      <div className="min-h-screen bg-[#050505] font-sans text-white pb-24 selection:bg-pink-500/30">
+        <style>{customStyles}</style>
+        {/* Header */}
+        <header className="sticky top-0 z-40 bg-black/90 backdrop-blur-md border-b border-pink-900/30 p-4 flex items-center justify-between shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl overflow-hidden border border-pink-500/30 bg-black">
+              <img src="/logo.jpg" alt="MF Store" className="w-full h-full object-cover" />
+            </div>
+            <div>
+              <h1 className="text-lg font-black tracking-widest text-white uppercase">MF Store</h1>
+              <p className="text-[10px] uppercase font-black tracking-[0.2em] text-pink-500">Catálogo Online</p>
+            </div>
+          </div>
+          <button onClick={() => setIsPublicCartOpen(true)} className="relative p-2 text-pink-500 hover:text-pink-400 transition-colors btn-press">
+            <ShoppingCart size={24} />
+            {vitrineCart.length > 0 && (
+              <span className="absolute top-0 right-0 bg-emerald-500 text-black text-[10px] font-black w-4 h-4 flex items-center justify-center rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]">
+                {vitrineCart.reduce((a, b) => a + b.quantity, 0)}
+              </span>
+            )}
+          </button>
+        </header>
+
+        {/* Products Grid */}
+        <div className="p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-6xl mx-auto">
+          {products.filter(p => p.stock > 0 && p.isVitrine).length === 0 ? (
+             <div className="col-span-full text-center py-20 text-zinc-600 font-medium">Nenhum produto disponível no momento.</div>
+          ) : (
+            products.filter(p => p.stock > 0 && p.isVitrine).map(p => {
+              const inBag = vitrineCart.find(i => i.id === p.id);
+              return (
+                <div key={p.id} className="bg-[#121212] rounded-3xl overflow-hidden shadow-sm border border-zinc-800 flex flex-col relative animate-fade-in-up hover-lift">
+                  <div className="h-44 bg-zinc-900 relative border-b border-zinc-800">
+                    {p.image ? <img src={p.image} className="w-full h-full object-cover opacity-90" /> : <Tag className="w-full h-full p-8 text-zinc-700 mx-auto" />}
+                    <span className="absolute top-2 left-2 bg-black/80 text-white text-[10px] font-black px-2.5 py-1 rounded-md border border-pink-500/30 backdrop-blur">{p.size}</span>
+                  </div>
+                  <div className="p-4 flex-1 flex flex-col">
+                    <p className="text-sm font-bold text-white line-clamp-2 mb-2 leading-tight">{p.name}</p>
+                    <div className="mt-auto flex flex-col gap-3">
+                      <span className="font-black text-pink-500 text-lg">{formatCurrency(p.price)}</span>
+                      {inBag ? (
+                        <div className="flex items-center justify-between bg-black rounded-xl border border-pink-500/30 overflow-hidden h-10">
+                           <button onClick={() => setVitrineCart(vitrineCart.map(i => i.id === p.id ? { ...i, quantity: i.quantity - 1 } : i).filter(i => i.quantity > 0))} className="px-4 h-full text-zinc-400 hover:text-red-500 hover:bg-zinc-900 active:bg-zinc-800 transition-colors">-</button>
+                           <span className="font-black text-sm text-white">{inBag.quantity}</span>
+                           <button onClick={() => addToVitrineCart(p)} className="px-4 h-full text-pink-500 hover:bg-pink-900/30 active:bg-pink-900/50 transition-colors">+</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => addToVitrineCart(p)} className="w-full py-2.5 bg-pink-900/10 text-pink-400 border border-pink-500/30 hover:bg-pink-600 hover:text-black rounded-xl text-xs font-black transition-colors uppercase tracking-wider btn-press">
+                          Adicionar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        {/* Floating Cart Bar */}
+        {vitrineCart.length > 0 && (
+           <div className="fixed bottom-0 inset-x-0 p-4 bg-gradient-to-t from-black via-black to-transparent z-40 animate-fade-in-up">
+              <button onClick={() => setIsPublicCartOpen(true)} className="w-full max-w-md mx-auto py-4 bg-pink-600 text-black font-black uppercase tracking-widest rounded-2xl shadow-[0_0_25px_rgba(236,72,153,0.4)] flex items-center justify-between px-6 btn-press">
+                 <span className="flex items-center gap-2"><ShoppingCart size={18} /> Ver Sacola ({vitrineCart.reduce((a,b)=>a+b.quantity,0)})</span>
+                 <span>{formatCurrency(vitrineTotal)}</span>
+              </button>
+           </div>
+        )}
+
+        {/* Cart Modal */}
+        {isPublicCartOpen && (
+          <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex justify-center animate-modal">
+             <div className="w-full max-w-md bg-[#050505] flex flex-col h-full shadow-2xl">
+               <div className="p-5 border-b border-zinc-800 flex justify-between items-center bg-[#121212]">
+                  <h2 className="text-xl font-black text-white flex items-center gap-2"><ShoppingCart className="text-pink-500"/> Sua Sacola</h2>
+                  <button onClick={() => setIsPublicCartOpen(false)} className="p-2 bg-black rounded-full text-zinc-400 border border-zinc-800 hover:text-white btn-press"><X size={20}/></button>
+               </div>
+               
+               <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                  {vitrineCart.length === 0 ? (
+                     <div className="flex flex-col items-center justify-center h-full text-zinc-600 opacity-60">
+                        <ShoppingCart size={48} className="mb-4" />
+                        <p className="font-bold text-lg">Sacola Vazia</p>
+                     </div>
+                  ) : (
+                     vitrineCart.map(item => (
+                        <div key={item.id} className="flex items-center bg-[#121212] p-3 rounded-2xl border border-zinc-800 animate-fade-in">
+                          <div className="w-16 h-16 bg-black rounded-xl overflow-hidden mr-3 border border-zinc-800">
+                            {item.image ? <img src={item.image} className="w-full h-full object-cover opacity-90" /> : <Tag className="w-full h-full p-4 text-zinc-700 mx-auto" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-white text-sm line-clamp-1">{item.name}</p>
+                            <p className="text-xs font-black text-pink-500 mt-1">{formatCurrency(item.price)}</p>
+                            <div className="flex items-center gap-3 mt-2">
+                               <span className="text-[10px] font-black bg-black border border-zinc-800 px-2 py-0.5 rounded text-zinc-400">Tam: {item.size}</span>
+                               <span className="text-[10px] font-black text-zinc-400">Qtd: <span className="text-white">{item.quantity}</span></span>
+                            </div>
+                          </div>
+                          <button onClick={() => {
+                             const newCart = vitrineCart.filter(i => i.id !== item.id);
+                             setVitrineCart(newCart);
+                             if (newCart.length === 0) setIsPublicCartOpen(false);
+                          }} className="p-3 text-zinc-600 hover:text-red-500 bg-black rounded-xl border border-zinc-900 ml-2 btn-press"><Trash2 size={16}/></button>
+                        </div>
+                     ))
+                  )}
+               </div>
+
+               {vitrineCart.length > 0 && (
+                  <div className="p-6 bg-[#121212] border-t border-pink-500/20 shadow-[0_-10px_30px_rgba(236,72,153,0.05)] space-y-5 rounded-t-3xl">
+                     <div className="flex justify-between items-end">
+                        <span className="text-zinc-400 font-bold uppercase text-xs tracking-widest">Total do Pedido</span>
+                        <span className="text-3xl font-black text-white">{formatCurrency(vitrineTotal)}</span>
+                     </div>
+                     <div>
+                        <label className="block text-xs font-black text-zinc-500 uppercase mb-2 tracking-widest">Como você se chama?</label>
+                        <input type="text" placeholder="Seu nome completo" value={vitrineCustomerName} onChange={e => setVitrineCustomerName(e.target.value)} className="w-full bg-black border border-zinc-800 rounded-xl px-4 py-4 text-sm font-bold text-white placeholder-zinc-700 focus:border-pink-500 outline-none transition-colors" />
+                     </div>
+                     <a href={getVitrineOrderWhatsAppLink()} target="_blank" rel="noreferrer" onClick={(e) => { if(!vitrineCustomerName) { e.preventDefault(); showToast('Por favor, insira o seu nome!', 'error'); } }} className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest rounded-xl shadow-[0_0_25px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2 btn-press transition-colors">
+                        <MessageCircle size={20} /> Enviar Pedido
+                     </a>
+                  </div>
+               )}
+             </div>
+          </div>
+        )}
+        
+        {/* Toast for public */}
+        {toast && (
+          <div className="fixed top-6 right-6 px-6 py-4 rounded-2xl shadow-2xl z-[100] flex items-center space-x-3 animate-fade-in-up border bg-black text-white border-zinc-700">
+            <CheckCircle2 size={20} className="text-pink-500" />
+            <span className="font-semibold text-sm tracking-wide">{toast.message}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (!isAuthenticated && !isCatalogView) {
     return (
       <div className="min-h-screen bg-black font-sans text-white flex items-center justify-center p-4 relative overflow-hidden selection:bg-pink-500/30">
         <style>{customStyles}</style>
@@ -851,7 +993,7 @@ export default function MFStoreOS() {
                 <div className="flex flex-col gap-3 mb-6">
                   <div className="relative flex-1">
                     <Search className="absolute left-4 top-3.5 text-pink-500/50" size={18} />
-                    <input type="text" placeholder="Buscar peça ou usar leitor de código de barras..." value={posSearchQuery} onChange={(e) => setPosSearchQuery(e.target.value)} ref={posSearchRef}
+                    <input type="text" placeholder="Buscar ou bipar código de barras..." value={posSearchQuery} onChange={(e) => setPosSearchQuery(e.target.value)} ref={posSearchRef}
                       className="w-full pl-11 pr-4 py-3 bg-[#121212] border border-pink-500/20 rounded-2xl focus:ring-2 focus:ring-pink-500 shadow-sm font-medium transition-shadow text-white placeholder-zinc-600" />
                   </div>
                   <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1">
@@ -876,7 +1018,7 @@ export default function MFStoreOS() {
                           <div className="absolute top-2 right-2 bg-black/80 backdrop-blur border border-pink-500/30 px-2 py-1 rounded-md text-xs font-black text-white">{p.size}</div>
                         </div>
                         <div className="p-3 flex-1 flex flex-col">
-                          <p className="font-bold text-white text-sm line-clamp-2 leading-tight mb-1">{p.name}</p>
+                          <p className="font-bold text-white text-sm line-clamp-2 leading-tight mb-2">{p.name}</p>
                           <div className="mt-auto flex justify-between items-end">
                             <span className="font-black text-pink-400">{formatCurrency(p.price)}</span>
                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${p.stock <= 3 ? 'bg-red-900/50 text-red-400 border border-red-500/30' : 'bg-black border border-zinc-800 text-zinc-400'}`}>{p.stock} un</span>
@@ -888,6 +1030,7 @@ export default function MFStoreOS() {
                 </div>
               </div>
 
+              {/* O Container do Carrinho que causava o conflito foi ajustado aqui (h-auto no mobile, sticky no PC) */}
               <div className="w-full xl:w-[400px] bg-[#121212] rounded-3xl shadow-2xl shadow-black border border-pink-500/20 flex flex-col flex-shrink-0 animate-slide-in-right h-auto xl:sticky xl:top-4 xl:h-[calc(100vh-100px)]">
                 <div className="p-5 bg-pink-600 text-black rounded-t-3xl relative overflow-hidden">
                   <div className="flex items-center justify-between relative z-10">
@@ -942,7 +1085,7 @@ export default function MFStoreOS() {
                           {item.image ? <img src={item.image} className="w-full h-full object-cover opacity-80" /> : <Tag className="w-full h-full p-3 text-zinc-700" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-bold text-white text-sm truncate">{item.name}</p>
+                          <p className="font-bold text-white text-sm line-clamp-2 leading-tight mb-1">{item.name}</p>
                           <p className="text-xs font-bold text-pink-500">{formatCurrency(item.price)}</p>
                         </div>
                         <div className="flex items-center gap-2 bg-black rounded-xl p-1 border border-zinc-800">
@@ -1154,7 +1297,7 @@ export default function MFStoreOS() {
                     <div key={sale.id} className="bg-[#121212] rounded-3xl p-6 shadow-sm border border-zinc-800 flex flex-col lg:flex-row justify-between gap-6 hover:border-pink-500/20 transition-colors">
                       <div className="space-y-3 flex-1">
                         <div className="flex flex-wrap items-center gap-3">
-                          <span className="px-3 py-1 bg-black border border-zinc-700 text-pink-400 rounded-xl text-xs font-black uppercase">{sale.paymentMethod}</span>
+                          <span className="px-3 py-1 bg-black text-white rounded-xl text-xs font-black uppercase">{sale.paymentMethod}</span>
                           <h4 className="font-black text-lg text-white">{sale.customerName}</h4>
                           <span className="text-xs font-bold text-zinc-500">{new Date(sale.timestamp).toLocaleString('pt-BR')}</span>
                           {sale.voucherCode && (<span className="text-xs bg-emerald-900/30 border border-emerald-500/30 text-emerald-400 font-bold px-2.5 py-1 rounded-lg">Usou Vale: {sale.voucherCode}</span>)}
@@ -1360,34 +1503,34 @@ export default function MFStoreOS() {
           )}
 
           {activeTab === 'vitrine' && (
-            <div className="animate-fade-in-up flex flex-col items-center pb-10">
+            <div className="animate-fade-in-up flex flex-col items-center justify-center min-h-[60vh] pb-10">
               <div className="text-center mb-6">
-                <h2 className="text-3xl font-black text-white flex items-center justify-center gap-2"><Globe className="text-pink-500"/> Vitrine Digital Interativa</h2>
-                <div className="mt-4 inline-flex items-center gap-2 bg-[#121212] px-4 py-2 rounded-2xl border border-pink-500/20 shadow-sm"><MessageCircle size={16} className="text-emerald-500" /><span className="text-xs font-bold text-zinc-500">WhatsApp da Loja:</span><input type="text" value={storeWhatsapp} onChange={e => setStoreWhatsapp(e.target.value)} className="text-xs font-black text-white bg-black px-2.5 py-1 rounded-lg border border-zinc-800 w-32 focus:border-pink-500" /></div>
+                <div className="w-24 h-24 bg-[#121212] rounded-3xl mx-auto flex items-center justify-center border border-pink-500/30 mb-6 shadow-[0_0_30px_rgba(236,72,153,0.15)]"><Globe className="text-pink-500" size={40}/></div>
+                <h2 className="text-4xl font-black text-white mb-2">Catálogo Online Ativo</h2>
+                <p className="text-zinc-400 max-w-md mx-auto text-sm leading-relaxed">O seu catálogo é atualizado automaticamente. Copie o link abaixo e envie para as suas clientes verem o estoque em tempo real direto no celular delas!</p>
               </div>
-              <div className="w-full max-w-[370px] h-[740px] bg-black rounded-[3rem] border-[10px] border-[#1a1a1a] shadow-[0_0_30px_rgba(236,72,153,0.1)] relative overflow-hidden flex flex-col hover-lift">
-                <div className="absolute top-0 inset-x-0 h-6 bg-[#1a1a1a] rounded-b-3xl w-40 mx-auto z-50"></div>
-                <div className="pt-10 pb-4 px-6 bg-[#121212] text-white text-center border-b border-pink-500/10"><div className="w-20 h-20 rounded-2xl mx-auto flex items-center justify-center bg-black overflow-hidden mb-2 shadow-[0_0_15px_rgba(236,72,153,0.2)] border border-pink-500/20"><img src="/logo.jpg" alt="MF Store Logo" className="w-full h-full object-cover" /></div><h3 className="font-black text-lg uppercase tracking-wider mt-2">MF Store</h3></div>
-                <div className="flex-1 overflow-y-auto p-3.5 bg-black custom-scrollbar">
-                  <div className="grid grid-cols-2 gap-3">
-                    {vitrineProducts.map(p => {
-                      const inBag = vitrineCart.find(i => i.id === p.id);
-                      return (
-                        <div key={p.id} onClick={() => addToVitrineCart(p)} className="bg-[#121212] rounded-2xl overflow-hidden shadow-sm border border-zinc-800 flex flex-col cursor-pointer hover:border-pink-500 transition-all relative group btn-press">
-                          <div className="h-32 bg-zinc-900 relative border-b border-zinc-800">{p.image ? <img src={p.image} className="w-full h-full object-cover opacity-80 group-hover:opacity-100" /> : <Tag className="w-full h-full p-6 text-zinc-700 mx-auto" />}<span className="absolute top-2 left-2 bg-black/80 text-white text-[10px] font-black px-2 py-0.5 rounded-md border border-pink-500/30">{p.size}</span>{inBag && (<span className="absolute top-2 right-2 bg-emerald-500 text-black text-[10px] font-black px-2 py-0.5 rounded-full shadow">{inBag.quantity}x</span>)}</div>
-                          <div className="p-2.5 flex-1 flex flex-col"><p className="text-xs font-bold text-white line-clamp-1 mb-1">{p.name}</p><div className="mt-auto flex items-center justify-between"><span className="text-xs font-black text-pink-500">{formatCurrency(p.price)}</span><span className="text-[10px] font-bold bg-black border border-zinc-800 text-zinc-400 px-2 py-0.5 rounded-lg group-hover:bg-pink-600 group-hover:border-pink-600 group-hover:text-black transition-colors">+ Sacola</span></div></div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="p-4 bg-[#121212] border-t border-pink-500/10 space-y-2.5">
-                  {vitrineCart.length > 0 && (<div className="space-y-2 animate-fade-in"><div className="flex justify-between items-center text-xs"><span className="font-bold text-zinc-400">{vitrineCart.reduce((a, i) => a + i.quantity, 0)} peças</span><div className="flex items-center gap-2"><span className="font-black text-white">{formatCurrency(vitrineTotal)}</span><button onClick={() => setVitrineCart([])} className="text-[10px] text-red-500 font-bold">Limpar</button></div></div><input type="text" placeholder="Seu nome..." value={vitrineCustomerName} onChange={e => setVitrineCustomerName(e.target.value)} className="w-full px-3 py-2 bg-black border border-zinc-800 rounded-xl text-xs font-bold text-white focus:border-pink-500" /></div>)}
-                  <div className="flex gap-2">
-                    <a href={vitrineCart.length > 0 ? getVitrineOrderWhatsAppLink() : '#'} target={vitrineCart.length > 0 ? "_blank" : undefined} rel="noreferrer" onClick={e => { if (vitrineCart.length === 0) { e.preventDefault(); showToast('Adicione peças!', 'error'); } }} className={`flex-1 py-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 shadow-md btn-press ${vitrineCart.length > 0 ? 'bg-emerald-500 hover:bg-emerald-600 text-black' : 'bg-zinc-900 text-zinc-600 border border-zinc-800'}`}><MessageCircle size={15} /> Pedir no WhatsApp</a>
-                    {vitrineCart.length > 0 && (<button onClick={sendVitrineOrderToPOS} className="px-3 py-3 bg-pink-600 hover:bg-pink-500 text-black rounded-xl text-xs font-black btn-press flex items-center gap-1"><ShoppingBag size={14} /> PDV</button>)}
-                  </div>
-                </div>
+              
+              <div className="w-full max-w-md bg-[#121212] p-8 rounded-[2rem] border border-pink-500/10 shadow-2xl flex flex-col gap-5">
+                 <button onClick={() => {
+                    const link = `${window.location.origin}?catalogo=true`;
+                    navigator.clipboard.writeText(link);
+                    showToast('Link do catálogo copiado!');
+                 }} className="w-full py-5 bg-pink-600 text-black font-black uppercase tracking-widest rounded-2xl shadow-[0_0_20px_rgba(236,72,153,0.3)] flex items-center justify-center gap-3 btn-press hover-lift">
+                    <Globe size={20}/> Copiar Link do Catálogo
+                 </button>
+                 
+                 <div className="flex flex-col gap-2 bg-black px-5 py-4 rounded-2xl border border-zinc-800 shadow-inner mt-2">
+                    <div className="flex items-center gap-2">
+                      <MessageCircle size={18} className="text-emerald-500" />
+                      <span className="block text-xs font-bold text-zinc-500 uppercase tracking-wider">Receber pedidos no número:</span>
+                    </div>
+                    <input type="text" value={storeWhatsapp} onChange={e => setStoreWhatsapp(e.target.value)} className="w-full text-xl font-black text-white bg-transparent border-b border-zinc-800 focus:border-pink-500 focus:outline-none focus:ring-0 px-1 py-2 transition-colors" placeholder="Ex: 14999999999" />
+                    <p className="text-[10px] text-zinc-600 font-medium">As clientes serão direcionadas para este WhatsApp ao finalizar a compra no catálogo.</p>
+                 </div>
+                 
+                 <a href={`${window.location.origin}?catalogo=true`} target="_blank" rel="noreferrer" className="text-center text-xs font-bold text-pink-500 hover:text-pink-400 mt-2 uppercase tracking-widest underline underline-offset-4">
+                    Visualizar Catálogo como Cliente
+                 </a>
               </div>
             </div>
           )}
@@ -1425,9 +1568,9 @@ export default function MFStoreOS() {
                   <input required type="number" step="0.01" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} className="w-full bg-black border border-zinc-800 text-white rounded-xl px-4 py-3 font-bold focus:border-pink-500" />
                 </div>
                 {!isGridMode && (<div><label className="block text-xs font-bold text-zinc-500 uppercase mb-1">Estoque</label><input required type="number" value={newProduct.stock} onChange={e => setNewProduct({...newProduct, stock: e.target.value})} className="w-full bg-black border border-zinc-800 text-white rounded-xl px-4 py-3 font-bold focus:border-pink-500" /></div>)}
-                <div className="flex items-center gap-3 pt-6"><input type="checkbox" id="vitrine" checked={newProduct.isVitrine} onChange={e => setNewProduct({...newProduct, isVitrine: e.target.checked})} className="w-5 h-5 rounded text-pink-600 bg-black border-zinc-700" /><label htmlFor="vitrine" className="text-sm font-bold text-zinc-400 cursor-pointer">Mostrar na Vitrine Digital</label></div>
+                <div className="flex items-center gap-3 pt-6"><input type="checkbox" id="vitrine" checked={newProduct.isVitrine} onChange={e => setNewProduct({...newProduct, isVitrine: e.target.checked})} className="w-5 h-5 rounded text-pink-600 bg-black border-zinc-700" /><label htmlFor="vitrine" className="text-sm font-bold text-zinc-400 cursor-pointer">Mostrar no Catálogo Digital</label></div>
               </div>
-              <button type="submit" disabled={isProcessingImage || isSavingProduct} className="w-full py-4 mt-4 rounded-xl font-black text-black bg-pink-600 hover:bg-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.4)] btn-press">{isSavingProduct ? 'Salvando...' : 'Salvar Produto'}</button>
+              <button type="submit" disabled={isProcessingImage || isSavingProduct} className="w-full py-4 mt-4 rounded-xl font-black text-black bg-pink-600 hover:bg-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.4)] btn-press">{isSavingProduct ? 'A Guardar...' : 'Salvar Produto'}</button>
             </form>
           </div>
         </div>
